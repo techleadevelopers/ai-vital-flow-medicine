@@ -1,0 +1,17 @@
+[project]
+name = "repl-nix-workspace"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.116.1",
+    "httpx>=0.28.1",
+    "joblib>=1.5.1",
+    "numpy>=2.3.1",
+    "pandas>=2.3.1",
+    "pydantic>=2.11.7",
+    "python-multipart>=0.0.20",
+    "scikit-learn>=1.7.0",
+    "tensorflow>=2.14.0",
+    "uvicorn>=0.35.0",
+]

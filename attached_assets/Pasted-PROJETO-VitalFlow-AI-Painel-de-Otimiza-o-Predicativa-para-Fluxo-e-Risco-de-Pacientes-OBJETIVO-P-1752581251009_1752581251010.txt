@@ -1,0 +1,114 @@
+PROJETO: VitalFlow AI - Painel de Otimização Predicativa para Fluxo e Risco de Pacientes
+
+OBJETIVO PRINCIPAL:
+Desenvolver um MVP (Minimum Viable Product) de um painel web que utilize IA avançada (Machine Learning e Large Language Models) para otimizar o fluxo de pacientes em hospitais, prever riscos clínicos e auxiliar na alocação de recursos. O foco é uma interface de usuário futurista, confortável e altamente intuitiva, com clara visão de produto para o setor de HealthTech.
+
+CONTEXTO TÉCNICO E AMBIENTE:
+- **Ambiente:** Replit (para desenvolvimento e colaboração, se aplicável) ou IDE com suporte a IA.
+- **Backend:** Node.js (com Express ou NestJS para estrutura de APIs robusta e modular).
+- **Frontend:** React.js (com Next.js para renderização SSR/SSG para performance, se necessário, ou Create React App para um MVP mais rápido).
+- **Banco de Dados:** PostgreSQL (para dados estruturados como informações de pacientes, leitos, histórico).
+- **Cache/Mensageria:** Redis (para caching, filas de jobs de IA, real-time updates).
+- **IA/ML:** Python (com FastAPI para servir os modelos de ML). Bibliotecas: TensorFlow/Keras ou PyTorch (para modelos preditivos), Scikit-learn (para modelos mais simples), LangChain/LlamaIndex (para orquestração de LLM e RAG).
+- **LLM:** Integração via API (OpenAI GPT-4o, Anthropic Claude 3).
+- **Dados:** Totalmente baseados em **dados fictícios/sintéticos** de pacientes, simulando realismo para treinamento e demonstração da IA.
+- **UI/UX:** Design futurista, limpo, intuitivo, focado em visualização de dados e usabilidade em ambientes de alta pressão. Cores suaves, tipografia legível, animações sutis, feedback visual claro. Priorizar a "confortabilidade" para o usuário.
+- **Deploy:** Considerar arquitetura para **Google Cloud Platform (GCP)**, especialmente para a parte de IA/ML (Vertex AI, VMs com GPUs).
+
+---
+
+TAREFAS E COMPONENTES CHAVE PARA A IA GERAR/AUXILIAR:
+
+## 1. Estrutura do Projeto e Configuração Inicial
+
+**GERAR:**
+- Estrutura de pastas para um monorepo (ou separadas) com `backend/` (Node.js), `frontend/` (React/Next.js), `ai_models/` (Python/FastAPI), `data_simulation/`.
+- Arquivos de configuração iniciais: `package.json` para Node.js, `requirements.txt` para Python, `.env.example`.
+- Scripts básicos de `start` e `install` nos `package.json`.
+- Configuração inicial do Express/NestJS no backend e Next.js/CRA no frontend.
+- Arquivos `.dockerignore` e `Dockerfile`s básicos para backend e ML server (opcional, mas mostra escalabilidade).
+
+---
+
+## 2. Geração de Dados Sintéticos Realistas
+
+**GERAR:**
+- Um script Python (`data_simulation/generate_patient_data.py`) que gere **dados fictícios, porém realistas**, de pacientes.
+- Os dados devem incluir:
+    - **Informações Demográficas:** `patient_id`, `age`, `gender`, `admission_date`, `discharge_date` (se aplicável).
+    - **Sinais Vitais:** `heart_rate`, `blood_pressure` (systolic/diastolic), `temperature`, `respiratory_rate`, `oxygen_saturation`. Simular variações ao longo do tempo (ex: a cada hora).
+    - **Resultados de Exames Laboratoriais (simples):** `glucose_level`, `white_blood_cell_count`, `creatinine`. Simular valores normais e anormais.
+    - **Diagnósticos Simples (texto livre):** `main_diagnosis`, `comorbidities` (simular condições como "diabetes", "hipertensão", "infecção respiratória").
+    - **Eventos Fictícios de Deterioração/Melhora:** Marcar aleatoriamente alguns pacientes como "em deterioração" ou "em melhora" para que a IA possa aprender esses padrões.
+    - **Dados de Leitos:** `bed_id`, `type` (e.g., "UTI", "Enfermaria"), `status` (e.g., "ocupado", "vago", "limpeza").
+- O script deve gerar um volume de dados suficiente para demonstração (e.g., 500-1000 pacientes com 24-72 horas de dados vitais simulados).
+- Exemplo de output em formato JSON ou CSV.
+
+---
+
+## 3. Backend (Node.js) - APIs e Integração
+
+**GERAR:**
+- **Esboço das APIs REST (endpoints) no Node.js (Express/NestJS):**
+    - `GET /api/patients`: Listar todos os pacientes com seus últimos dados.
+    - `GET /api/patients/:id`: Detalhes de um paciente específico.
+    - `GET /api/beds`: Status e tipo de todos os leitos.
+    - `POST /api/data-ingestion`: Endpoint para receber novos dados sintéticos (simulando um feed de dados hospitalares).
+    - `GET /api/predictions/risk`: Obter predições de risco de deterioração para todos os pacientes.
+    - `GET /api/predictions/bed-allocation`: Obter sugestões de alocação de leitos.
+    - `POST /api/llm/summarize-patient`: Enviar texto de prontuário e receber resumo/análise do LLM.
+- **Configuração de banco de dados PostgreSQL:** Modelo de dados (tabelas para pacientes, sinais vitais, leitos, previsões) e script de conexão (`db.js` ou via TypeORM/Prisma se usar NestJS).
+- **Integração Redis:** Exemplo de uso para cache de predições frequentes ou para gerenciar filas de tarefas (jobs assíncronos para IA).
+
+---
+
+## 4. Servidor de IA/ML (Python com FastAPI)
+
+**GERAR:**
+- Um arquivo Python (`ai_models/main.py`) com um servidor FastAPI.
+- **Endpoint para Predição de Risco de Deterioração:**
+    - `POST /predict/risk`: Recebe dados de um paciente (sinais vitais, exames) e retorna uma probabilidade de risco de deterioração.
+    - **Stub do Modelo ML:** Incluir um placeholder para um modelo de ML (ex: um RandomForestClassifier ou um pequeno modelo Keras/TensorFlow) que seria treinado com os dados sintéticos. O modelo deve retornar um score de 0 a 100.
+- **Endpoint para Otimização de Leitos (exemplo simples):**
+    - `POST /optimize/beds`: Recebe lista de pacientes (com risco) e lista de leitos, retorna uma sugestão simples de alocação.
+- **Código para Interação com LLM:**
+    - Funções para chamar a API da OpenAI/Anthropic para:
+        - Resumir texto de prontuário (simulado).
+        - Gerar uma explicação "amigável" do score de risco.
+
+---
+
+## 5. Frontend (React.js/Next.js) - UI Futurista e Confortável
+
+**GERAR:**
+- **Layout Base:** Componentes de layout (Header, Sidebar de navegação, Main Content Area).
+- **Páginas Principais (Componentes React):**
+    - **Dashboard Geral (`/dashboard`):**
+        - Card de "Visão Geral de Leitos": Ocupação total, leitos livres (UTI/Enfermaria).
+        - Gráfico de "Fluxo de Pacientes (Últimas 24h/Próximas 24h)": Simular entradas/saídas.
+        - Tabela/Lista de "Pacientes de Alto Risco": Com nome, ID, score de risco e um botão "Detalhes".
+    - **Detalhes do Paciente (`/patients/:id`):**
+        - Informações demográficas básicas.
+        - Gráfico de Linha para Sinais Vitais (evolução ao longo do tempo).
+        - Seção de "Diagnóstico e Recomendações da IA" (texto gerado pelo LLM).
+    - **Gerenciamento de Leitos (`/beds`):**
+        - Visualização de Leitos (grade ou lista) com status (ocupado/vago) e tipo.
+        - Um botão/função "Otimizar Alocação" que chame a API de IA.
+- **Componentes Reutilizáveis:** Botões, Cards, Tabela Simples, Gráficos (usar biblioteca de gráficos como Recharts ou Nivo).
+- **Estilização:** Usar **Tailwind CSS** ou **Chakra UI** para um design limpo, moderno, com foco em conforto visual (cores suaves, espaçamento adequado, tipografia legível). Incluir um tema de cores básicas.
+- **Conexão Backend:** Exemplo de como fazer chamadas `fetch` ou `axios` para as APIs do backend Node.js.
+
+---
+
+## 6. Documentação Inicial
+
+**GERAR:**
+- Um arquivo `README.md` completo para o repositório principal:
+    - Descrição do projeto (VitalFlow AI).
+    - Problema que resolve.
+    - Principais funcionalidades (destacando a IA).
+    - Tecnologias utilizadas (Frontend, Backend, IA, DB, Cloud).
+    - Como rodar o projeto localmente (instalação de dependências, scripts de start).
+    - **Seção "Visão de Produto":** Descrever o público-alvo, a proposta de valor e como ele se diferencia no mercado de HealthTech.
+
+---

@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Cyberpunk Dark Theme */
+  --background: hsl(210, 15%, 8%);
+  --foreground: hsl(120, 100%, 80%);
+  --muted: hsl(210, 20%, 12%);
+  --muted-foreground: hsl(120, 50%, 60%);
+  --popover: hsl(210, 15%, 10%);
+  --popover-foreground: hsl(120, 100%, 85%);
+  --card: hsl(210, 20%, 10%);
+  --card-foreground: hsl(120, 100%, 85%);
+  --border: hsl(120, 60%, 25%);
+  --input: hsl(210, 20%, 15%);
+  --primary: hsl(120, 100%, 50%);
+  --primary-foreground: hsl(210, 15%, 8%);
+  --secondary: hsl(120, 80%, 40%);
+  --secondary-foreground: hsl(210, 15%, 8%);
+  --accent: hsl(160, 100%, 50%);
+  --accent-foreground: hsl(210, 15%, 8%);
+  --destructive: hsl(0, 100%, 60%);
+  --destructive-foreground: hsl(210, 15%, 8%);
+  --warning: hsl(45, 100%, 60%);
+  --warning-foreground: hsl(210, 15%, 8%);
+  --ring: hsl(120, 100%, 50%);
+  --radius: 0.5rem;
+  --chart-1: hsl(120, 100%, 50%);
+  --chart-2: hsl(160, 100%, 50%);
+  --chart-3: hsl(180, 100%, 50%);
+  --chart-4: hsl(45, 100%, 60%);
+  --chart-5: hsl(0, 100%, 60%);
+  
+  /* Neon glow effects */
+  --neon-green: hsl(120, 100%, 50%);
+  --neon-cyan: hsl(180, 100%, 50%);
+  --neon-blue: hsl(200, 100%, 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background: linear-gradient(135deg, #0a0a0f 0%, #0f1419 50%, #0a0a0f 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    background: rgba(10, 20, 25, 0.8);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 255, 150, 0.2);
+    box-shadow: 0 0 20px rgba(0, 255, 150, 0.1);
+  }
+
+  .chart-container {
+    position: relative;
+    height: 300px;
+  }
+
+  .nav-item.active {
+    @apply bg-primary text-primary-foreground;
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+  }
+
+  .status-indicator {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-indicator.high-risk {
+    @apply bg-destructive animate-pulse;
+    box-shadow: 0 0 10px rgba(255, 0, 100, 0.5);
+  }
+
+  .status-indicator.medium-risk {
+    @apply bg-warning;
+    box-shadow: 0 0 8px rgba(255, 200, 0, 0.4);
+  }
+
+  .status-indicator.low-risk {
+    @apply bg-secondary;
+    box-shadow: 0 0 8px rgba(0, 255, 100, 0.4);
+  }
+
+  .risk-card {
+    @apply border-l-4 transition-all duration-200 hover:shadow-md;
+    background: rgba(15, 25, 30, 0.9);
+    border: 1px solid rgba(0, 255, 150, 0.2);
+  }
+
+  .risk-card.high {
+    border-left-color: rgb(255, 50, 100);
+    box-shadow: 0 0 15px rgba(255, 50, 100, 0.2);
+  }
+
+  .risk-card.medium {
+    border-left-color: rgb(255, 200, 0);
+    box-shadow: 0 0 15px rgba(255, 200, 0, 0.2);
+  }
+
+  .risk-card.low {
+    border-left-color: rgb(0, 255, 100);
+    box-shadow: 0 0 15px rgba(0, 255, 100, 0.2);
+  }
+
+  .cyber-glow {
+    box-shadow: 0 0 20px rgba(0, 255, 150, 0.3);
+    border: 1px solid rgba(0, 255, 150, 0.4);
+  }
+
+  .neon-text {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .cyberpunk-card {
+    background: linear-gradient(145deg, rgba(15, 25, 30, 0.95), rgba(10, 20, 25, 0.95));
+    border: 1px solid rgba(0, 255, 150, 0.3);
+    box-shadow: 
+      0 0 20px rgba(0, 255, 150, 0.1),
+      inset 0 1px 0 rgba(0, 255, 150, 0.1);
+  }
+
+  .cyberpunk-button {
+    background: linear-gradient(145deg, rgba(0, 255, 150, 0.1), rgba(0, 255, 150, 0.05));
+    border: 1px solid rgba(0, 255, 150, 0.4);
+    box-shadow: 0 0 15px rgba(0, 255, 150, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .cyberpunk-button:hover {
+    box-shadow: 0 0 25px rgba(0, 255, 150, 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in-out;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
