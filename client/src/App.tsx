@@ -8,6 +8,14 @@ import Patients from "@/pages/patients";
 import PatientDetails from "@/pages/patient-details";
 import Beds from "@/pages/beds";
 import Predictions from "@/pages/predictions";
+import Analytics from "@/pages/analytics";
+import RiskAnalysis from "@/pages/risk-analysis";
+import FlowPrediction from "@/pages/flow-prediction";
+import Reports from "@/pages/reports";
+import Admissions from "@/pages/admissions";
+import Emergency from "@/pages/emergency";
+import Discharges from "@/pages/discharges";
+import Anomalies from "@/pages/anomalies";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -26,6 +34,14 @@ function Router() {
             <Route path="/patients/:id" component={PatientDetails} />
             <Route path="/beds" component={Beds} />
             <Route path="/predictions" component={Predictions} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/risk-analysis" component={RiskAnalysis} />
+            <Route path="/flow-prediction" component={FlowPrediction} />
+            <Route path="/reports" component={Reports} />
+            <Route path="/admissions" component={Admissions} />
+            <Route path="/emergency" component={Emergency} />
+            <Route path="/discharges" component={Discharges} />
+            <Route path="/anomalies" component={Anomalies} />
             <Route component={NotFound} />
           </Switch>
         </div>

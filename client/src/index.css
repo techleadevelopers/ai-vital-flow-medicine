@@ -3,39 +3,42 @@
 @tailwind utilities;
 
 :root {
-  /* Cyberpunk Dark Theme */
-  --background: hsl(210, 15%, 8%);
-  --foreground: hsl(120, 100%, 80%);
-  --muted: hsl(210, 20%, 12%);
-  --muted-foreground: hsl(120, 50%, 60%);
-  --popover: hsl(210, 15%, 10%);
-  --popover-foreground: hsl(120, 100%, 85%);
-  --card: hsl(210, 20%, 10%);
-  --card-foreground: hsl(120, 100%, 85%);
-  --border: hsl(120, 60%, 25%);
-  --input: hsl(210, 20%, 15%);
-  --primary: hsl(120, 100%, 50%);
-  --primary-foreground: hsl(210, 15%, 8%);
-  --secondary: hsl(120, 80%, 40%);
-  --secondary-foreground: hsl(210, 15%, 8%);
-  --accent: hsl(160, 100%, 50%);
-  --accent-foreground: hsl(210, 15%, 8%);
-  --destructive: hsl(0, 100%, 60%);
-  --destructive-foreground: hsl(210, 15%, 8%);
-  --warning: hsl(45, 100%, 60%);
-  --warning-foreground: hsl(210, 15%, 8%);
-  --ring: hsl(120, 100%, 50%);
-  --radius: 0.5rem;
-  --chart-1: hsl(120, 100%, 50%);
-  --chart-2: hsl(160, 100%, 50%);
-  --chart-3: hsl(180, 100%, 50%);
-  --chart-4: hsl(45, 100%, 60%);
-  --chart-5: hsl(0, 100%, 60%);
+  /* Modern Light Theme with Green Medical Focus */
+  --background: hsl(120, 20%, 98%);
+  --foreground: hsl(120, 10%, 15%);
+  --muted: hsl(120, 10%, 95%);
+  --muted-foreground: hsl(120, 8%, 45%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(120, 10%, 15%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(120, 10%, 15%);
+  --border: hsl(120, 20%, 88%);
+  --input: hsl(120, 10%, 96%);
+  --primary: hsl(142, 76%, 36%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(142, 30%, 85%);
+  --secondary-foreground: hsl(142, 76%, 20%);
+  --accent: hsl(142, 60%, 50%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --warning: hsl(38, 92%, 50%);
+  --warning-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(142, 76%, 36%);
+  --radius: 0.75rem;
+  --chart-1: hsl(142, 76%, 36%);
+  --chart-2: hsl(173, 58%, 39%);
+  --chart-3: hsl(197, 37%, 24%);
+  --chart-4: hsl(43, 74%, 66%);
+  --chart-5: hsl(27, 87%, 67%);
   
-  /* Neon glow effects */
-  --neon-green: hsl(120, 100%, 50%);
-  --neon-cyan: hsl(180, 100%, 50%);
-  --neon-blue: hsl(200, 100%, 60%);
+  /* Medical theme colors */
+  --medical-primary: hsl(142, 76%, 36%);
+  --medical-secondary: hsl(173, 58%, 39%);
+  --medical-accent: hsl(142, 60%, 50%);
+  --success-light: hsl(142, 76%, 90%);
+  --warning-light: hsl(38, 92%, 90%);
+  --error-light: hsl(0, 84%, 90%);
 }
 
 @layer base {
@@ -45,96 +48,133 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    background: linear-gradient(135deg, #0a0a0f 0%, #0f1419 50%, #0a0a0f 100%);
+    background: linear-gradient(135deg, hsl(120, 20%, 98%) 0%, hsl(120, 15%, 96%) 50%, hsl(120, 25%, 97%) 100%);
     min-height: 100vh;
   }
 }
 
 @layer components {
   .glass-effect {
-    background: rgba(10, 20, 25, 0.8);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(15px);
-    border: 1px solid rgba(0, 255, 150, 0.2);
-    box-shadow: 0 0 20px rgba(0, 255, 150, 0.1);
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   }
 
   .chart-container {
     position: relative;
-    height: 300px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
   }
 
   .nav-item.active {
     @apply bg-primary text-primary-foreground;
-    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+    box-shadow: 0 2px 10px rgba(34, 197, 94, 0.2);
   }
 
   .status-indicator {
-    @apply w-2 h-2 rounded-full;
+    @apply w-3 h-3 rounded-full;
   }
 
   .status-indicator.high-risk {
     @apply bg-destructive animate-pulse;
-    box-shadow: 0 0 10px rgba(255, 0, 100, 0.5);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
   }
 
   .status-indicator.medium-risk {
     @apply bg-warning;
-    box-shadow: 0 0 8px rgba(255, 200, 0, 0.4);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
   }
 
   .status-indicator.low-risk {
-    @apply bg-secondary;
-    box-shadow: 0 0 8px rgba(0, 255, 100, 0.4);
+    @apply bg-medical-primary;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
   }
 
   .risk-card {
-    @apply border-l-4 transition-all duration-200 hover:shadow-md;
-    background: rgba(15, 25, 30, 0.9);
-    border: 1px solid rgba(0, 255, 150, 0.2);
+    @apply border-l-4 transition-all duration-300 hover:shadow-lg;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
   }
 
   .risk-card.high {
-    border-left-color: rgb(255, 50, 100);
-    box-shadow: 0 0 15px rgba(255, 50, 100, 0.2);
+    border-left-color: hsl(var(--destructive));
+    background: hsl(var(--error-light));
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.1);
   }
 
   .risk-card.medium {
-    border-left-color: rgb(255, 200, 0);
-    box-shadow: 0 0 15px rgba(255, 200, 0, 0.2);
+    border-left-color: hsl(var(--warning));
+    background: hsl(var(--warning-light));
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
   }
 
   .risk-card.low {
-    border-left-color: rgb(0, 255, 100);
-    box-shadow: 0 0 15px rgba(0, 255, 100, 0.2);
+    border-left-color: hsl(var(--medical-primary));
+    background: hsl(var(--success-light));
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.1);
   }
 
-  .cyber-glow {
-    box-shadow: 0 0 20px rgba(0, 255, 150, 0.3);
-    border: 1px solid rgba(0, 255, 150, 0.4);
+  .medical-glow {
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.15);
+    border: 1px solid hsl(var(--medical-primary) / 0.3);
   }
 
-  .neon-text {
-    text-shadow: 0 0 10px currentColor;
+  .medical-text {
+    color: hsl(var(--medical-primary));
+    font-weight: 600;
   }
 
-  .cyberpunk-card {
-    background: linear-gradient(145deg, rgba(15, 25, 30, 0.95), rgba(10, 20, 25, 0.95));
-    border: 1px solid rgba(0, 255, 150, 0.3);
+  .medical-card {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
     box-shadow: 
-      0 0 20px rgba(0, 255, 150, 0.1),
-      inset 0 1px 0 rgba(0, 255, 150, 0.1);
-  }
-
-  .cyberpunk-button {
-    background: linear-gradient(145deg, rgba(0, 255, 150, 0.1), rgba(0, 255, 150, 0.05));
-    border: 1px solid rgba(0, 255, 150, 0.4);
-    box-shadow: 0 0 15px rgba(0, 255, 150, 0.2);
+      0 4px 20px rgba(0, 0, 0, 0.05),
+      0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
   }
 
-  .cyberpunk-button:hover {
-    box-shadow: 0 0 25px rgba(0, 255, 150, 0.4);
+  .medical-card:hover {
+    box-shadow: 
+      0 8px 30px rgba(0, 0, 0, 0.1),
+      0 2px 8px rgba(34, 197, 94, 0.1);
     transform: translateY(-2px);
+  }
+
+  .medical-button {
+    background: linear-gradient(145deg, hsl(var(--medical-primary)), hsl(var(--medical-secondary)));
+    border: none;
+    color: white;
+    box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .medical-button:hover {
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
+    transform: translateY(-1px);
+  }
+
+  .flow-chart-advanced {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fffe 100%);
+    border: 2px solid hsl(var(--medical-primary) / 0.2);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flow-chart-advanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, hsl(var(--medical-primary)), hsl(var(--medical-secondary)));
   }
 }
 

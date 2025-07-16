@@ -7,6 +7,7 @@ import BedOccupancy from "@/components/dashboard/bed-occupancy";
 import VitalSignsChart from "@/components/charts/vital-signs-chart";
 import RecentActivities from "@/components/dashboard/recent-activities";
 import AIInsights from "@/components/dashboard/ai-insights";
+import AIPredictionsAdvanced from "@/components/dashboard/ai-predictions-advanced";
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -20,9 +21,12 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Overview Cards */}
+    <div className="space-y-6 animate-fade-in">
+      {/* Overview Cards Enterprise */}
       <OverviewCards stats={stats} isLoading={statsLoading} />
+
+      {/* AI Predictions Advanced Section */}
+      <AIPredictionsAdvanced />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

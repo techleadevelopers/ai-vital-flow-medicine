@@ -9,7 +9,8 @@ import sys
 import os
 
 def main():
-    print("🚀 Starting VitalFlow AI Server...")
+    print("🧠 Starting VitalFlow Advanced AI Server...")
+    print("🔄 Initializing TensorFlow Neural Networks...")
     
     # Change to ai_server directory
     ai_server_dir = os.path.join(os.path.dirname(__file__), 'ai_server')
@@ -18,28 +19,36 @@ def main():
         print("❌ AI server directory not found!")
         sys.exit(1)
     
+    # Set TensorFlow environment variables for optimization
+    env = os.environ.copy()
+    env['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Reduce TensorFlow logging
+    env['TF_ENABLE_ONEDNN_OPTS'] = '1'  # Enable oneDNN optimizations
+    
     try:
-        # Start the FastAPI server
+        # Start the FastAPI server with advanced ML models
         cmd = [
             sys.executable, "-m", "uvicorn", 
             "main:app", 
             "--host", "0.0.0.0", 
             "--port", "8000", 
-            "--reload"
+            "--reload",
+            "--workers", "1"
         ]
         
         print(f"🔧 Running: {' '.join(cmd)}")
-        print("📍 Server will be available at: http://localhost:8000")
-        print("📊 API docs available at: http://localhost:8000/docs")
+        print("📍 Advanced AI Server: http://localhost:8000")
+        print("📊 Neural Network API docs: http://localhost:8000/docs")
+        print("🚀 Ensemble models loading...")
         print("")
         
-        # Run the server
-        subprocess.run(cmd, cwd=ai_server_dir, check=True)
+        # Run the server with TensorFlow optimizations
+        subprocess.run(cmd, cwd=ai_server_dir, check=True, env=env)
         
     except KeyboardInterrupt:
-        print("\n⏹️  AI Server stopped by user")
+        print("\n⏹️  AI Server stopped gracefully")
     except subprocess.CalledProcessError as e:
         print(f"❌ Error starting AI server: {e}")
+        print("💡 Make sure TensorFlow and dependencies are installed")
         sys.exit(1)
     except Exception as e:
         print(f"❌ Unexpected error: {e}")
