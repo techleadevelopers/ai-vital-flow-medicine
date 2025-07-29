@@ -1,13 +1,10 @@
-"""
-VitalFlow AI - Advanced Neural Network Healthcare ML Server
-Real AI/ML implementation with TensorFlow for critical healthcare predictions
-Advanced anomaly detection, ensemble methods, and deep learning
-"""
+# main.py - VitalFlow AI v5.0 Server
+# Esta versão integra os modelos avançados do advanced_models.py (VitalFlow AI v5.0)
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional, Tuple
 import uvicorn
 import numpy as np
 import pandas as pd
@@ -16,45 +13,50 @@ import joblib
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, models, optimizers, callbacks
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor, IsolationForest
-from sklearn.preprocessing import StandardScaler, RobustScaler, LabelEncoder
-from sklearn.model_selection import train_test_split, cross_val_score
 import logging
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score, mean_squared_error
-from sklearn.neural_network import MLPClassifier, MLPRegressor
 import warnings
 warnings.filterwarnings('ignore')
 
-# Import advanced models
-from advanced_models import causal_ai, digital_twin, rl_optimizer, initialize_advanced_models
+# Importa os modelos avançados e a configuração da nova arquitetura V5
+from advanced_models import (
+    causal_ai, digital_twin, rl_optimizer, gnn_module, federated_orchestrator,
+    initialize_and_train_all_models_v5, config as vitalflow_config # Renomeia 'config' para evitar conflito
+)
+# Importa classes específicas para uso nos modelos Pydantic de resposta
+from advanced_models import IndividualCausalEffect, FormalVerificationReport
 
-# Configurar TensorFlow para otimização
-# tf.config.experimental.enable_mlir_graph_optimization()
+# Configuração de logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-tf.get_logger().setLevel('ERROR')
+tf.get_logger().setLevel('ERROR') # Suprime avisos do TensorFlow
 
 app = FastAPI(
-    title="VitalFlow AI Server",
-    description="Real Machine Learning API for Healthcare Predictions",
-    version="1.0.0"
+    title="VitalFlow AI Server - v5.0 (IA Hospitalar Futurística)",
+    description="API de IA em tempo real, Ética, Explicável e Adaptativa para Operações Hospitalares, alimentada pelos modelos VitalFlow v5.0.",
+    version="5.0.0"
 )
 
-# CORS middleware for frontend integration
+# Middleware CORS para integração com frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # Permite todas as origens para desenvolvimento. Ajuste para produção.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models
-class PatientData(BaseModel):
-    patient_id: str
-    age: int
-    gender: str
+# --- Modelos Pydantic para a API V5 ---
+
+# Reutiliza IndividualCausalEffect do advanced_models, adaptando para resposta
+class IndividualCausalEffectResponse(BaseModel):
+    treatment: str
+    outcome: str
+    point_estimate: float
+    confidence_interval: Tuple[float, float]
+    patient_segment: Dict[str, Any]
+    counterfactual_explanation: Optional[Dict[str, Any]] = None
+
+class VitalSignData(BaseModel):
     heart_rate: Optional[float] = None
     blood_pressure_systolic: Optional[float] = None
     blood_pressure_diastolic: Optional[float] = None
@@ -64,676 +66,391 @@ class PatientData(BaseModel):
     glucose_level: Optional[float] = None
     white_blood_cell_count: Optional[float] = None
     creatinine: Optional[float] = None
-    comorbidities: Optional[str] = None
+
+class PatientDataV5(BaseModel):
+    patient_id: str
+    age: int
+    gender: str
     admission_date: str
+    comorbidities: Optional[str] = None
+    vital_signs: Optional[VitalSignData] = Field(default_factory=VitalSignData) # Garante que seja sempre um objeto VitalSignData
 
-class RiskPrediction(BaseModel):
+class RiskPredictionV5(BaseModel):
     patient_id: str
-    risk_score: float
-    confidence: float
-    factors: List[str]
-    recommendation: str
-    model_accuracy: float
+    overall_risk_score: float = Field(..., description="Pontuação de risco agregada de 0 a 100.")
+    risk_factors_identified: List[str] = Field(..., description="Fatores chave que contribuem para o risco.")
+    recommendation: str = Field(..., description="Recomendação acionável gerada pela IA.")
+    causal_analysis: Optional[IndividualCausalEffectResponse] = Field(None, description="Insights causais detalhados e contrafactuais.")
+    model_confidence: float = Field(..., description="Nível de confiança da predição (0-1).")
 
-class BedOptimization(BaseModel):
+class PatientFlowScenario(BaseModel):
+    scenario_id: str = Field(..., description="ID único para este cenário simulado.")
+    hour_predictions: List[Dict[str, Any]] = Field(..., description="Lista de predições horárias para admissões, altas, ocupação, etc.")
+    plausibility_score: float = Field(..., description="Pontuação indicando a plausibilidade deste cenário (0-1).")
+    key_metrics: Dict[str, Any] = Field(..., description="Métricas de resumo para o cenário (ex: pico de ocupação, tempo médio de espera).")
+
+class BedOptimizationV5(BaseModel):
     patient_id: str
-    current_bed: str
-    recommended_bed: str
-    reason: str
-    priority: int
-    confidence: float
+    recommended_action: str = Field(..., description="Ação específica recomendada para alocação de leitos.")
+    reasoning: str = Field(..., description="Explicação para a recomendação, derivada do agente de RL.")
+    priority: int = Field(..., description="Nível de prioridade para a ação (1=mais alta).")
+    confidence: float = Field(..., description="Confiança na recomendação (0-1).")
+    expected_impact: Dict[str, float] = Field(..., description="Impacto esperado quantificado da ação (ex: {'reducao_mortalidade': 0.05}).")
 
-class PatientFlowPrediction(BaseModel):
-    hour: int
-    predicted_admissions: int
-    predicted_discharges: int
-    confidence: float
+class EquipmentData(BaseModel):
+    equipment_id: str
+    sensor_data: List[float] # Exemplo: [temperatura, pressão, vibração, tempo_de_uso, dias_desde_ultima_manutencao]
+    sequence_length: int = Field(..., description="Comprimento da sequência de dados do sensor para predição.")
 
-# Global ML models storage
-ml_models = {
-    'risk_classifier': None,
-    'flow_predictor': None,
-    'bed_optimizer': None,
-    'scalers': {}
-}
+class EquipmentFailurePrediction(BaseModel):
+    equipment_id: str
+    failure_probability: float = Field(..., description="Probabilidade prevista de falha (0-1).")
+    recommendation: str = Field(..., description="Recomendação acionável para manutenção.")
+    confidence: float = Field(..., description="Confiança na predição (0-1).")
 
-def generate_synthetic_training_data():
-    """Generate realistic medical training data for ML models"""
-    np.random.seed(42)
-    n_samples = 5000
-    
-    # Generate patient features
-    ages = np.random.normal(65, 15, n_samples).clip(18, 95)
-    genders = np.random.choice([0, 1], n_samples)  # 0=Female, 1=Male
-    
-    # Vital signs (realistic ranges)
-    heart_rates = np.random.normal(75, 15, n_samples).clip(40, 150)
-    bp_systolic = np.random.normal(130, 20, n_samples).clip(90, 200)
-    bp_diastolic = np.random.normal(80, 15, n_samples).clip(50, 130)
-    temperatures = np.random.normal(98.6, 1.5, n_samples).clip(95, 105)
-    resp_rates = np.random.normal(16, 4, n_samples).clip(8, 40)
-    oxygen_sats = np.random.normal(97, 3, n_samples).clip(85, 100)
-    
-    # Lab values
-    glucose = np.random.normal(100, 30, n_samples).clip(50, 400)
-    wbc = np.random.normal(7, 3, n_samples).clip(2, 20)
-    creatinine = np.random.normal(1.0, 0.5, n_samples).clip(0.5, 5.0)
-    
-    # Create risk labels based on realistic medical criteria
-    risk_factors = []
-    for i in range(n_samples):
-        risk_score = 0
-        
-        # Age factor
-        if ages[i] > 75: risk_score += 2
-        elif ages[i] > 65: risk_score += 1
-        
-        # Vital signs abnormalities
-        if heart_rates[i] > 100 or heart_rates[i] < 60: risk_score += 1
-        if bp_systolic[i] > 160 or bp_systolic[i] < 90: risk_score += 1
-        if temperatures[i] > 100.4 or temperatures[i] < 96: risk_score += 2
-        if resp_rates[i] > 24 or resp_rates[i] < 12: risk_score += 1
-        if oxygen_sats[i] < 92: risk_score += 3
-        
-        # Lab abnormalities
-        if glucose[i] > 180 or glucose[i] < 70: risk_score += 1
-        if wbc[i] > 12 or wbc[i] < 4: risk_score += 1
-        if creatinine[i] > 1.5: risk_score += 2
-        
-        # Convert to risk categories
-        if risk_score >= 6: risk_factors.append(2)  # High risk
-        elif risk_score >= 3: risk_factors.append(1)  # Medium risk
-        else: risk_factors.append(0)  # Low risk
-    
-    # Create DataFrame
-    data = pd.DataFrame({
-        'age': ages,
-        'gender': genders,
-        'heart_rate': heart_rates,
-        'bp_systolic': bp_systolic,
-        'bp_diastolic': bp_diastolic,
-        'temperature': temperatures,
-        'respiratory_rate': resp_rates,
-        'oxygen_saturation': oxygen_sats,
-        'glucose': glucose,
-        'wbc': wbc,
-        'creatinine': creatinine,
-        'risk_level': risk_factors
-    })
-    
-    return data
+class NetworkAnalysisRequest(BaseModel):
+    graph_snapshot: Dict[str, Any] = Field(..., description="Instantâneo atual da rede hospitalar (nós e arestas).")
+    analysis_type: str = Field(..., description="Tipo de análise solicitada (ex: 'propagacao_infeccao', 'gargalo_recursos').")
 
-def create_advanced_neural_network(input_dim, num_classes=3):
-    """Criar rede neural avançada para predição de risco crítico"""
-    model = keras.Sequential([
-        layers.Input(shape=(input_dim,)),
-        
-        # Primeira camada densa com dropout
-        layers.Dense(256, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001)),
-        layers.BatchNormalization(),
-        layers.Dropout(0.3),
-        
-        # Segunda camada 
-        layers.Dense(128, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001)),
-        layers.BatchNormalization(),
-        layers.Dropout(0.2),
-        
-        # Terceira camada
-        layers.Dense(64, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001)),
-        layers.BatchNormalization(),
-        layers.Dropout(0.2),
-        
-        # Camada de atenção personalizada
-        layers.Dense(32, activation='tanh'),
-        layers.Dense(32, activation='sigmoid'),  # Mecanismo de atenção
-        
-        # Camada final de classificação
-        layers.Dense(num_classes, activation='softmax')
-    ])
-    
-    # Otimizador avançado
-    optimizer = keras.optimizers.Adam(
-        learning_rate=0.001,
-        beta_1=0.9,
-        beta_2=0.999,
-        epsilon=1e-07
-    )
-    
-    model.compile(
-        optimizer=optimizer,
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy', 'precision', 'recall']
-    )
-    
-    return model
+class NetworkAnalysisReportResponse(BaseModel):
+    analysis_type: str
+    identified_risks: List[str]
+    recommendations: List[str]
+    timestamp: str
 
-def train_risk_prediction_model():
-    """Treinar modelo avançado de predição de risco com Neural Networks"""
-    logger.info("🧠 Treinando modelo avançado de rede neural para predição de risco crítico...")
-    
-    # Generate training data
-    data = generate_synthetic_training_data()
-    
-    # Prepare features
-    feature_columns = ['age', 'gender', 'heart_rate', 'bp_systolic', 'bp_diastolic', 
-                      'temperature', 'respiratory_rate', 'oxygen_saturation', 
-                      'glucose', 'wbc', 'creatinine']
-    
-    X = data[feature_columns].values
-    y = data['risk_level'].values
-    
-    # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-    
-    # Scale features com RobustScaler (melhor para dados médicos)
-    scaler = RobustScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
-    # Criar e treinar rede neural avançada
-    neural_model = create_advanced_neural_network(X_train_scaled.shape[1], 3)
-    
-    # Callbacks para otimização
-    early_stopping = callbacks.EarlyStopping(
-        monitor='val_accuracy', 
-        patience=10, 
-        restore_best_weights=True
-    )
-    
-    reduce_lr = callbacks.ReduceLROnPlateau(
-        monitor='val_loss', 
-        factor=0.5, 
-        patience=5,
-        min_lr=1e-6
-    )
-    
-    # Treinar modelo neural
-    history = neural_model.fit(
-        X_train_scaled, y_train,
-        validation_data=(X_test_scaled, y_test),
-        epochs=100,
-        batch_size=32,
-        callbacks=[early_stopping, reduce_lr],
-        verbose=0
-    )
-    
-    # Avaliar modelo neural
-    neural_accuracy = neural_model.evaluate(X_test_scaled, y_test, verbose=0)[1]
-    y_pred_neural = np.argmax(neural_model.predict(X_test_scaled, verbose=0), axis=1)
-    
-    # Modelo ensemble: Neural Network + Random Forest + Gradient Boosting
-    rf_model = RandomForestClassifier(n_estimators=200, max_depth=15, random_state=42)
-    gb_model = GradientBoostingRegressor(n_estimators=150, max_depth=8, random_state=42)
-    
-    rf_model.fit(X_train_scaled, y_train)
-    
-    # Ensemble predictions
-    rf_pred = rf_model.predict(X_test_scaled)
-    neural_pred = y_pred_neural
-    
-    # Weighted ensemble
-    ensemble_pred = []
-    for i in range(len(y_test)):
-        # Peso maior para rede neural (70%) e RF (30%)
-        weighted_pred = 0.7 * neural_pred[i] + 0.3 * rf_pred[i]
-        ensemble_pred.append(round(weighted_pred))
-    
-    ensemble_accuracy = accuracy_score(y_test, ensemble_pred)
-    
-    logger.info(f"🎯 Modelo Neural: Acurácia = {neural_accuracy:.3f}")
-    logger.info(f"🌲 Random Forest: Acurácia = {accuracy_score(y_test, rf_pred):.3f}")
-    logger.info(f"🚀 Ensemble Final: Acurácia = {ensemble_accuracy:.3f}")
-    logger.info(f"📊 Relatório Neural:\n{classification_report(y_test, y_pred_neural)}")
-    
-    # Detectar anomalias com Isolation Forest
-    anomaly_detector = IsolationForest(contamination=0.1, random_state=42)
-    anomaly_detector.fit(X_train_scaled)
-    
-    # Store models
-    ml_models['neural_risk_model'] = neural_model
-    ml_models['risk_classifier'] = rf_model
-    ml_models['anomaly_detector'] = anomaly_detector
-    ml_models['scalers']['risk'] = scaler
-    ml_models['ensemble_weights'] = {'neural': 0.7, 'rf': 0.3}
-    
-    return neural_model, rf_model, scaler, ensemble_accuracy
+class FormalVerificationReportSummary(BaseModel): # Simplificado para resposta da API
+    policy_name: str
+    property_checked: str
+    is_safe: bool
+    details: str
+    timestamp: str
 
-def create_lstm_flow_model():
-    """Criar modelo LSTM avançado para predição de fluxo temporal"""
-    model = keras.Sequential([
-        layers.LSTM(128, return_sequences=True, input_shape=(24, 3)),
-        layers.Dropout(0.2),
-        layers.LSTM(64, return_sequences=True),
-        layers.Dropout(0.2),
-        layers.LSTM(32, return_sequences=False),
-        layers.Dense(50, activation='relu'),
-        layers.Dropout(0.1),
-        layers.Dense(24, activation='relu')  # 24 horas de predição
-    ])
-    
-    model.compile(
-        optimizer='adam',
-        loss='mse',
-        metrics=['mae']
-    )
-    
-    return model
-
-def train_flow_prediction_model():
-    """Treinar modelo LSTM avançado para predição de fluxo de pacientes"""
-    logger.info("🔄 Treinando modelo LSTM para predição de fluxo temporal...")
-    
-    # Generate time series data for patient flow com padrões realistas
-    np.random.seed(42)
-    
-    # Padrões mais realistas baseados em dados hospitalares
-    base_admissions = [1, 0, 0, 0, 1, 2, 4, 7, 9, 8, 6, 5, 7, 8, 9, 7, 5, 4, 3, 3, 2, 2, 2, 1]
-    base_discharges = [0, 0, 0, 0, 0, 1, 2, 4, 6, 9, 12, 10, 8, 6, 5, 4, 3, 2, 1, 1, 1, 0, 0, 0]
-    
-    # Criar dados de séries temporais mais complexos
-    sequence_length = 24
-    n_sequences = 200
-    
-    # Preparar dados para LSTM
-    X_lstm = []
-    y_lstm = []
-    
-    for seq in range(n_sequences):
-        # Fatores sazonais realistas
-        weekly_factor = 1 + 0.4 * np.sin(seq * 2 * np.pi / 7)  # Padrão semanal
-        seasonal_factor = 1 + 0.2 * np.sin(seq * 2 * np.pi / 365)  # Padrão anual
-        
-        sequence_data = []
-        target_data = []
-        
-        for hour in range(sequence_length):
-            # Admissões com variações realistas
-            admissions = max(0, int(
-                base_admissions[hour] * weekly_factor * seasonal_factor + 
-                np.random.normal(0, 1.5)
-            ))
-            
-            # Altas com padrões diferentes
-            discharges = max(0, int(
-                base_discharges[hour] * weekly_factor * seasonal_factor + 
-                np.random.normal(0, 1.2)
-            ))
-            
-            # Ocupação baseada no histórico
-            occupancy = max(0, min(100, 
-                70 + (admissions - discharges) * 2 + np.random.normal(0, 5)
-            ))
-            
-            sequence_data.append([admissions, discharges, occupancy])
-            
-            # Target: próximas admissões
-            next_admissions = max(0, int(
-                base_admissions[(hour + 1) % 24] * weekly_factor + np.random.normal(0, 1)
-            ))
-            target_data.append(next_admissions)
-        
-        X_lstm.append(sequence_data)
-        y_lstm.append(target_data)
-    
-    X_lstm = np.array(X_lstm)
-    y_lstm = np.array(y_lstm)
-    
-    # Split temporal data
-    split_idx = int(0.8 * len(X_lstm))
-    X_train, X_test = X_lstm[:split_idx], X_lstm[split_idx:]
-    y_train, y_test = y_lstm[:split_idx], y_lstm[split_idx:]
-    
-    # Modelo LSTM principal
-    lstm_model = create_lstm_flow_model()
-    
-    # Early stopping para LSTM
-    early_stop = callbacks.EarlyStopping(monitor='val_loss', patience=15, restore_best_weights=True)
-    
-    # Treinar LSTM
-    history = lstm_model.fit(
-        X_train, y_train,
-        validation_data=(X_test, y_test),
-        epochs=50,
-        batch_size=16,
-        callbacks=[early_stop],
-        verbose=0
-    )
-    
-    # Modelos tradicionais como backup
-    # Preparar dados tradicionais para fallback
-    traditional_data = []
-    for seq in range(n_sequences):
-        for hour in range(24):
-            day_factor = 1 + 0.3 * np.sin(seq * 2 * np.pi / 7)
-            admissions = max(0, int(base_admissions[hour] * day_factor + np.random.normal(0, 1)))
-            discharges = max(0, int(base_discharges[hour] * day_factor + np.random.normal(0, 1)))
-            
-            traditional_data.append({
-                'hour': hour,
-                'day_of_week': seq % 7,
-                'admissions': admissions,
-                'discharges': discharges
-            })
-    
-    flow_data = pd.DataFrame(traditional_data)
-    X_flow = flow_data[['hour', 'day_of_week']]
-    y_admissions = flow_data['admissions']
-    y_discharges = flow_data['discharges']
-    
-    # Ensemble de modelos tradicionais
-    admission_rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    admission_gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
-    discharge_rf = RandomForestClassifier(n_estimators=100, random_state=42)
-    discharge_gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
-    
-    admission_gb.fit(X_flow, y_admissions)
-    discharge_gb.fit(X_flow, y_discharges)
-    
-    # Avaliar LSTM
-    lstm_loss = lstm_model.evaluate(X_test, y_test, verbose=0)[0]
-    
-    logger.info(f"🚀 Modelo LSTM treinado - Loss: {lstm_loss:.4f}")
-    logger.info(f"📈 Ensemble de modelos criado para robustez")
-    
-    # Store models
-    ml_models['lstm_flow_model'] = lstm_model
-    ml_models['flow_predictor'] = {
-        'admissions': admission_gb,
-        'discharges': discharge_gb
-    }
-    ml_models['flow_scaler'] = StandardScaler()
-    
-    return lstm_model, admission_gb, discharge_gb
+# --- Instâncias Globais de Modelos de IA Avançados ---
+# Estas são importadas diretamente do advanced_models.py
+# causal_ai, digital_twin, rl_optimizer, gnn_module, federated_orchestrator, vitalflow_config
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize ML models on startup"""
-    logger.info("Starting VitalFlow AI Server...")
+    """Inicializa todos os modelos avançados da VitalFlow AI na inicialização."""
+    logger.info("🚀 Iniciando VitalFlow AI Server v5.0...")
     
-    # Train all models
-    train_risk_prediction_model()
-    train_flow_prediction_model()
-    
-    # Initialize advanced AI models
-    logger.info("🧠 Initializing Advanced AI Models...")
-    initialize_advanced_models()
-    
-    logger.info("All ML models loaded and ready!")
+    try:
+        # Esta função orquestra o treinamento/carregamento de todos os modelos V5
+        await initialize_and_train_all_models_v5()
+        logger.info("✅ Todos os modelos VitalFlow AI v5.0 inicializados e prontos!")
+    except Exception as e:
+        logger.error(f"❌ Falha ao inicializar os modelos VitalFlow AI v5.0: {e}", exc_info=True)
+        # Em um sistema de produção, isso pode impedir o servidor de iniciar ou marcar os modelos como não saudáveis.
+        raise RuntimeError(f"Erro crítico durante a inicialização do modelo: {e}")
 
 @app.get("/")
 async def root():
     return {
-        "message": "VitalFlow AI Server - Real Machine Learning for Healthcare",
-        "version": "1.0.0",
-        "models_loaded": list(ml_models.keys())
+        "message": "VitalFlow AI Server - v5.0: IA Hospitalar Futurística operacional.",
+        "version": "5.0.0",
+        "system_status": "ativo",
+        "models_initialized": {
+            "causal_ai": causal_ai.is_trained,
+            "digital_twin": digital_twin.is_trained,
+            "rl_optimizer": rl_optimizer.is_trained,
+            "gnn_module": gnn_module.is_trained,
+            "federated_learning_enabled": vitalflow_config.FEDERATED_LEARNING_ENABLED
+        }
     }
 
-@app.post("/predict/risk", response_model=RiskPrediction)
-async def predict_patient_risk(patient: PatientData):
-    """Predição avançada de risco usando ensemble Neural Network + RandomForest"""
-    try:
-        if ml_models.get('neural_risk_model') is None or ml_models.get('risk_classifier') is None:
-            raise HTTPException(status_code=500, detail="Modelos de IA não carregados")
-        
-        # Preparar features
-        features = np.array([[
-            patient.age,
-            1 if patient.gender.lower() == 'male' else 0,
-            patient.heart_rate or 75,
-            patient.blood_pressure_systolic or 120,
-            patient.blood_pressure_diastolic or 80,
-            patient.temperature or 98.6,
-            patient.respiratory_rate or 16,
-            patient.oxygen_saturation or 98,
-            patient.glucose_level or 100,
-            patient.white_blood_cell_count or 7,
-            patient.creatinine or 1.0
-        ]])
-        
-        # Scale features
-        scaler = ml_models['scalers']['risk']
-        features_scaled = scaler.transform(features)
-        
-        # Predição com rede neural
-        neural_model = ml_models['neural_risk_model']
-        neural_pred = neural_model.predict(features_scaled, verbose=0)
-        neural_class = np.argmax(neural_pred[0])
-        neural_confidence = float(np.max(neural_pred[0]))
-        
-        # Predição com Random Forest
-        rf_model = ml_models['risk_classifier']
-        rf_class = rf_model.predict(features_scaled)[0]
-        rf_probabilities = rf_model.predict_proba(features_scaled)[0]
-        rf_confidence = float(max(rf_probabilities))
-        
-        # Detecção de anomalias
-        anomaly_score = ml_models['anomaly_detector'].decision_function(features_scaled)[0]
-        is_anomaly = anomaly_score < -0.1
-        
-        # Ensemble prediction (weighted)
-        weights = ml_models['ensemble_weights']
-        ensemble_class = round(weights['neural'] * neural_class + weights['rf'] * rf_class)
-        ensemble_confidence = weights['neural'] * neural_confidence + weights['rf'] * rf_confidence
-        
-        # Converter para score de risco (0-100)
-        base_risk = float(ensemble_class * 33.33)  # 0, 33, 66
-        confidence_boost = ensemble_confidence * 34  # até 34 pontos
-        risk_score = min(100, base_risk + confidence_boost)
-        
-        # Ajustar para anomalias
-        if is_anomaly:
-            risk_score = min(100, risk_score + 15)
-            
-        # Gerar fatores de risco avançados
-        factors = []
-        risk_weight = 0
-        
-        # Análise de sinais vitais críticos
-        if patient.heart_rate:
-            if patient.heart_rate > 120:
-                factors.append("Taquicardia severa")
-                risk_weight += 15
-            elif patient.heart_rate > 100:
-                factors.append("Taquicardia moderada")
-                risk_weight += 8
-            elif patient.heart_rate < 50:
-                factors.append("Bradicardia crítica")
-                risk_weight += 12
-        
-        if patient.temperature:
-            if patient.temperature > 102:
-                factors.append("Hipertermia crítica")
-                risk_weight += 20
-            elif patient.temperature > 100.4:
-                factors.append("Febre significativa")
-                risk_weight += 10
-            elif patient.temperature < 96:
-                factors.append("Hipotermia")
-                risk_weight += 15
-        
-        if patient.oxygen_saturation:
-            if patient.oxygen_saturation < 88:
-                factors.append("Hipoxemia severa")
-                risk_weight += 25
-            elif patient.oxygen_saturation < 92:
-                factors.append("Hipoxemia moderada")
-                risk_weight += 15
-        
-        if patient.blood_pressure_systolic:
-            if patient.blood_pressure_systolic > 180:
-                factors.append("Crise hipertensiva")
-                risk_weight += 18
-            elif patient.blood_pressure_systolic < 90:
-                factors.append("Hipotensão")
-                risk_weight += 12
-        
-        # Fatores laboratoriais
-        if patient.glucose_level:
-            if patient.glucose_level > 250:
-                factors.append("Hiperglicemia severa")
-                risk_weight += 12
-            elif patient.glucose_level < 60:
-                factors.append("Hipoglicemia")
-                risk_weight += 15
-        
-        if patient.creatinine and patient.creatinine > 2.0:
-            factors.append("Disfunção renal")
-            risk_weight += 10
-        
-        if patient.white_blood_cell_count:
-            if patient.white_blood_cell_count > 15:
-                factors.append("Leucocitose - possível infecção")
-                risk_weight += 8
-            elif patient.white_blood_cell_count < 3:
-                factors.append("Leucopenia")
-                risk_weight += 6
-        
-        # Fatores demográficos
-        if patient.age > 80:
-            factors.append("Idade muito avançada")
-            risk_weight += 5
-        elif patient.age > 70:
-            factors.append("Idade avançada")
-            risk_weight += 3
-        
-        if is_anomaly:
-            factors.append("Padrão atípico detectado por IA")
-            
-        # Ajustar score final
-        final_risk_score = min(100, risk_score + risk_weight * 0.5)
-        
-        # Gerar recomendação baseada em IA
-        if final_risk_score >= 80:
-            recommendation = "CRÍTICO: Intervenção imediata necessária. Transferir para UTI e iniciar protocolo de emergência."
-        elif final_risk_score >= 60:
-            recommendation = "ALTO RISCO: Monitoramento intensivo. Reavaliação médica em 2h. Considerar cuidados semi-intensivos."
-        elif final_risk_score >= 40:
-            recommendation = "RISCO MODERADO: Aumentar frequência de monitoramento. Reavaliação em 4-6h."
-        elif final_risk_score >= 20:
-            recommendation = "RISCO BAIXO: Manter cuidados padrão. Monitoramento de rotina."
-        else:
-            recommendation = "RISCO MÍNIMO: Protocolo de cuidados padrão adequado."
-        
-        # Calcular acurácia do modelo (baseada no ensemble)
-        model_accuracy = 0.89 + (ensemble_confidence * 0.08)  # 89-97%
-        
-        return RiskPrediction(
-            patient_id=patient.patient_id,
-            risk_score=final_risk_score,
-            confidence=ensemble_confidence,
-            factors=factors,
-            recommendation=recommendation,
-            model_accuracy=round(model_accuracy, 3)
-        )
-        
-    except Exception as e:
-        logger.error(f"Error predicting risk: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+@app.post("/predict/risk", response_model=RiskPredictionV5)
+async def predict_patient_risk(patient: PatientDataV5):
+    """
+    Prediz o risco do paciente usando IA Causal, fornecendo Efeitos de Tratamento Individualizados (ITE)
+    e explicações contrafactuais para maior interpretabilidade e acionabilidade.
+    """
+    if not causal_ai.is_trained:
+        raise HTTPException(status_code=503, detail="Modelo de IA Causal ainda não treinado ou carregado.")
 
-@app.get("/predict/flow", response_model=List[PatientFlowPrediction])
-async def predict_patient_flow():
-    """Predict patient flow for next 24 hours"""
     try:
-        if ml_models['flow_predictor'] is None:
-            raise HTTPException(status_code=500, detail="Flow prediction model not loaded")
+        # Prepara os dados do paciente para o modelo causal. Isso requer mapear PatientDataV5 para o
+        # formato esperado do método causal_ai.estimate_ite (uma Series/DataFrame pandas).
+        # Este é um passo crítico onde o mapeamento de dados reais precisa ser robusto.
+        # Para demonstração, criamos um DataFrame dummy.
+        patient_df = pd.DataFrame([{
+            'age': patient.age,
+            'gender': 1 if patient.gender.lower() == 'male' else 0,
+            'heart_rate': patient.vital_signs.heart_rate if patient.vital_signs else 75,
+            'blood_pressure_systolic': patient.vital_signs.blood_pressure_systolic if patient.vital_signs else 120,
+            'blood_pressure_diastolic': patient.vital_signs.blood_pressure_diastolic if patient.vital_signs else 80,
+            'temperature': patient.vital_signs.temperature if patient.vital_signs else 98.6,
+            'respiratory_rate': patient.vital_signs.respiratory_rate if patient.vital_signs else 16,
+            'oxygen_saturation': patient.vital_signs.oxygen_saturation if patient.vital_signs else 98,
+            'glucose_level': patient.vital_signs.glucose_level if patient.vital_signs else 100,
+            'white_blood_cell_count': patient.vital_signs.white_blood_cell_count if patient.vital_signs else 7,
+            'creatinine': patient.vital_signs.creatinine if patient.vital_signs else 1.0,
+            # Adiciona valores dummy para tratamento/resultado/confounders esperados por causal_ai.estimate_ite
+            'intervention_A': 0, # Assume nenhuma intervenção para linha de base
+            'intervention_B': 0,
+            'patient_recovery_rate': 0.5, # Placeholder para o resultado atual
+            'complication_risk': 0.2, # Placeholder para o resultado atual
+            'comorbidity_score': 5.0 # Placeholder
+        }])
         
-        predictions = []
-        current_hour = datetime.now().hour
-        current_day = datetime.now().weekday()
+        # Exemplo: Estima ITE para 'intervention_A' em 'complication_risk'
+        # Em um sistema real, a escolha do tratamento/resultado seria dinâmica com base no contexto.
+        causal_analysis_result: IndividualCausalEffect = causal_ai.estimate_ite(
+            patient_df,
+            treatment='intervention_A', # Tratamento de exemplo
+            outcome='complication_risk' # Resultado de exemplo
+        )
+
+        # Deriva o risco geral e a recomendação da análise causal e outros fatores
+        # Esta lógica seria mais sofisticada em um sistema real, combinando ITE com outros modelos de risco.
+        overall_risk_score = (causal_analysis_result.point_estimate * 100).clip(0, 100) # Mapeamento simples
+        risk_factors = [f"Efeito causal de {causal_analysis_result.treatment} em {causal_analysis_result.outcome} é {causal_analysis_result.point_estimate:.2f}"]
         
-        for i in range(24):
-            hour = (current_hour + i) % 24
-            day_of_week = (current_day + (current_hour + i) // 24) % 7
+        recommendation = "Com base na análise causal, considere intervenções específicas para um resultado ótimo."
+        if overall_risk_score > 70:
+            recommendation = f"CRÍTICO: Alto risco indicado. A análise causal sugere que '{causal_analysis_result.treatment}' pode impactar significativamente '{causal_analysis_result.outcome}'. Ação imediata necessária."
+        elif overall_risk_score > 40:
+            recommendation = f"ALTO RISCO: A análise causal destaca o impacto potencial de '{causal_analysis_result.treatment}' em '{causal_analysis_result.outcome}'. Monitore de perto e considere a intervenção."
+
+        # Confiança simulada (em um sistema real, isso viria da estimativa de incerteza do modelo)
+        model_confidence = 0.92 - (abs(causal_analysis_result.point_estimate) * 0.1) # Placeholder
+
+        return RiskPredictionV5(
+            patient_id=patient.patient_id,
+            overall_risk_score=float(overall_risk_score),
+            risk_factors_identified=risk_factors,
+            recommendation=recommendation,
+            causal_analysis=IndividualCausalEffectResponse(**causal_analysis_result.__dict__), # Converte dataclass para modelo Pydantic
+            model_confidence=model_confidence
+        )
+    except Exception as e:
+        logger.error(f"Erro ao predizer risco com IA Causal: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro de predição: {str(e)}")
+
+@app.get("/predict/flow", response_model=List[PatientFlowScenario])
+async def predict_patient_flow(num_scenarios: int = 3):
+    """
+    Prediz o fluxo de pacientes para o próximo período gerando múltiplos cenários futuros plausíveis
+    usando o Digital Twin Generativo.
+    """
+    if not digital_twin.is_trained:
+        raise HTTPException(status_code=503, detail="Modelo Digital Twin ainda não treinado ou carregado.")
+
+    try:
+        # Para demonstração, usa uma sequência dummy do último estado conhecido.
+        # Em um sistema real, isso viria de dados hospitalares em tempo real.
+        dummy_last_known_sequence = np.random.rand(vitalflow_config.DT_SEQUENCE_LENGTH, vitalflow_config.DT_FEATURES)
+        
+        # Gera múltiplos cenários futuros
+        synthetic_futures = digital_twin.generate_future_scenarios(dummy_last_known_sequence, num_scenarios)
+        
+        scenarios = []
+        for i, future_sequence in enumerate(synthetic_futures):
+            # Converte a sequência gerada em uma lista de predições horárias
+            # Este mapeamento precisa ser preciso com base na estrutura do seu DT_FEATURES
+            hourly_preds = []
+            for hour_idx in range(future_sequence.shape[0]):
+                # Assumindo que DT_FEATURES mapeiam para certas métricas (ex: admissões, altas, ocupação)
+                # Este é um mapeamento conceitual.
+                hourly_preds.append({
+                    "hour": hour_idx,
+                    "predicted_admissions": max(0, int(future_sequence[hour_idx, 0] * 10)), # Escala dados dummy
+                    "predicted_discharges": max(0, int(future_sequence[hour_idx, 1] * 8)),
+                    "predicted_occupancy_rate": float(future_sequence[hour_idx, 2] * 0.8 + 0.2).clip(0,1), # Escala para 0-1
+                    "predicted_staff_workload": float(future_sequence[hour_idx, 3] * 0.5 + 0.5).clip(0,1)
+                })
             
-            # Prepare features
-            features = np.array([[hour, day_of_week]])
-            
-            # Make predictions
-            admission_model = ml_models['flow_predictor']['admissions']
-            discharge_model = ml_models['flow_predictor']['discharges']
-            
-            predicted_admissions = max(0, int(admission_model.predict(features)[0]))
-            predicted_discharges = max(0, int(discharge_model.predict(features)[0]))
-            
-            predictions.append(PatientFlowPrediction(
-                hour=hour,
-                predicted_admissions=predicted_admissions,
-                predicted_discharges=predicted_discharges,
-                confidence=0.75  # Estimated based on model performance
+            # Plausibilidade e métricas chave simuladas
+            plausibility = 0.7 + np.random.rand() * 0.3 # Plausibilidade aleatória
+            key_metrics = {
+                "peak_occupancy_rate": max([p['predicted_occupancy_rate'] for p in hourly_preds]),
+                "total_admissions": sum([p['predicted_admissions'] for p in hourly_preds]),
+                "total_discharges": sum([p['predicted_discharges'] for p in hourly_preds])
+            }
+
+            scenarios.append(PatientFlowScenario(
+                scenario_id=f"scenario_{i+1}",
+                hour_predictions=hourly_preds,
+                plausibility_score=plausibility,
+                key_metrics=key_metrics
             ))
         
-        return predictions
+        return scenarios
         
     except Exception as e:
-        logger.error(f"Error predicting flow: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Flow prediction error: {str(e)}")
+        logger.error(f"Erro ao predizer fluxo com Digital Twin: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro de predição de fluxo: {str(e)}")
 
-@app.post("/optimize/beds")
-async def optimize_bed_allocation(patients: List[PatientData]):
-    """Optimize bed allocation using ML-based scoring"""
+@app.post("/optimize/beds", response_model=List[BedOptimizationV5])
+async def optimize_bed_allocation(patients: List[PatientDataV5]):
+    """
+    Otimiza a alocação de leitos usando o Otimizador de Aprendizado por Reforço,
+    considerando restrições éticas e fornecendo recomendações acionáveis.
+    """
+    if not rl_optimizer.is_trained:
+        raise HTTPException(status_code=503, detail="Otimizador de RL ainda não treinado ou carregado.")
+
     try:
         optimizations = []
+        # Em um sistema real, `current_hospital_state` seria uma observação abrangente
+        # do ambiente hospitalar, potencialmente incluindo dados agregados de pacientes,
+        # disponibilidade de recursos, etc., formatados para o agente de RL.
+        # Para esta demonstração, iteraremos pelos pacientes e simularemos a saída do RL.
+
+        # Uma abordagem mais realista seria agregar todos os dados do paciente em um único estado
+        # sobre o qual o agente de RL pode atuar, e o agente então produziria um conjunto de ações
+        # para todos os pacientes/recursos.
         
+        # Para simplicidade, vamos simular o agente de RL fornecendo recomendações por paciente
+        # com base em algum estado simplificado derivado.
         for patient in patients:
-            # Calculate acuity score based on vital signs
-            acuity_score = 0
+            # Cria um 'current_hospital_state' simplificado para este paciente para o agente de RL
+            # Isso precisa corresponder ao espaço de observação do HospitalEnvV5
+            # Para demonstração, um estado dummy (ex: sinais vitais do paciente como parte do estado)
+            current_patient_state_for_rl = np.array([
+                patient.age / 100.0, # Normaliza
+                1 if patient.gender.lower() == 'male' else 0,
+                (patient.vital_signs.oxygen_saturation or 98) / 100.0,
+                (patient.vital_signs.heart_rate or 75) / 150.0,
+                (patient.vital_signs.temperature or 98.6) / 105.0,
+                # ... outras features relevantes que o agente de RL observa
+            ])
+            # Preenche ou trunca para corresponder à forma esperada (vitalflow_config.DT_FEATURES)
+            # Este é um placeholder para engenharia de estado adequada.
+            padded_state = np.pad(current_patient_state_for_rl, (0, vitalflow_config.DT_FEATURES - len(current_patient_state_for_rl)), 'constant')
             
-            if patient.oxygen_saturation and patient.oxygen_saturation < 92:
-                acuity_score += 3
-            if patient.heart_rate and (patient.heart_rate > 100 or patient.heart_rate < 60):
-                acuity_score += 2
-            if patient.blood_pressure_systolic and patient.blood_pressure_systolic > 160:
-                acuity_score += 2
-            if patient.temperature and patient.temperature > 100.4:
-                acuity_score += 2
-            if patient.age > 75:
-                acuity_score += 1
-            
-            # Determine optimal bed type
-            if acuity_score >= 5:
-                recommended_bed = "ICU"
-                reason = "High acuity patient requiring intensive monitoring"
-                priority = 1
-            elif acuity_score >= 3:
-                recommended_bed = "Step-down"
-                reason = "Moderate acuity requiring enhanced monitoring"
-                priority = 2
-            else:
-                recommended_bed = "General"
-                reason = "Stable patient suitable for general ward"
-                priority = 3
-            
-            optimizations.append(BedOptimization(
+            # Obtém a recomendação do otimizador de RL
+            # O método `optimize_bed_allocation` do otimizador de RL retorna um Dict
+            rl_recommendation_output = rl_optimizer.optimize_bed_allocation(padded_state)
+
+            optimizations.append(BedOptimizationV5(
                 patient_id=patient.patient_id,
-                current_bed="General",  # Assume current placement
-                recommended_bed=recommended_bed,
-                reason=reason,
-                priority=priority,
-                confidence=0.85
+                recommended_action=rl_recommendation_output['recommended_action'],
+                reasoning=rl_recommendation_output['reasoning'],
+                priority=rl_recommendation_output['priority'],
+                confidence=rl_recommendation_output['confidence'],
+                expected_impact=rl_recommendation_output['expected_impact']
             ))
         
         return optimizations
         
     except Exception as e:
-        logger.error(f"Error optimizing beds: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Bed optimization error: {str(e)}")
+        logger.error(f"Erro ao otimizar leitos com Otimizador de RL: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro de otimização de leitos: {str(e)}")
+
+@app.post("/digital_twin/predict_equipment_failure", response_model=EquipmentFailurePrediction)
+async def predict_equipment_failure(equipment_data: EquipmentData):
+    """
+    Prediz a probabilidade de falha de equipamento usando o módulo de manutenção preditiva do Digital Twin.
+    """
+    if not digital_twin.config.DT_PREDICTIVE_MAINTENANCE_ENABLED:
+        raise HTTPException(status_code=400, detail="A manutenção preditiva não está habilitada na configuração do VitalFlow.")
+    if 'equipment' not in digital_twin.multi_scale_models:
+        raise HTTPException(status_code=503, detail="Modelo Digital Twin de equipamento não treinado ou carregado.")
+
+    try:
+        # Garante que os dados do sensor estejam no formato correto para o modelo
+        # O modelo espera (batch_size, sequence_length, num_features)
+        # Assumimos que equipment_data.sensor_data já tem o número correto de features por passo de tempo
+        num_features_per_step = len(equipment_data.sensor_data) // equipment_data.sequence_length
+        sensor_data_np = np.array(equipment_data.sensor_data).reshape(1, equipment_data.sequence_length, num_features_per_step)
+        
+        failure_prob = digital_twin.predict_equipment_failure(sensor_data_np, equipment_data.equipment_id)
+        
+        recommendation = "Monitore o equipamento regularmente."
+        if failure_prob > 0.7:
+            recommendation = "CRÍTICO: Alta probabilidade de falha. Agende manutenção imediata."
+        elif failure_prob > 0.4:
+            recommendation = "ALTO: Risco aumentado de falha. Planeje a manutenção em breve."
+
+        return EquipmentFailurePrediction(
+            equipment_id=equipment_data.equipment_id,
+            failure_probability=failure_prob,
+            recommendation=recommendation,
+            confidence=0.85 # Placeholder, deve ser derivado do modelo
+        )
+    except Exception as e:
+        logger.error(f"Erro ao predizer falha de equipamento: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro de predição de falha de equipamento: {str(e)}")
+
+@app.post("/gnn/analyze_network", response_model=NetworkAnalysisReportResponse)
+async def analyze_hospital_network(request: NetworkAnalysisRequest):
+    """
+    Analisa a rede interna do hospital (ex: transferências de pacientes, interações da equipe)
+    usando Redes Neurais Gráficas para identificar riscos como propagação de infecções ou gargalos de recursos.
+    """
+    if not gnn_module.is_trained:
+        raise HTTPException(status_code=503, detail="Módulo GNN não treinado ou carregado.")
+
+    try:
+        # O `graph_snapshot` seria processado pelo módulo GNN.
+        # Para demonstração, passamos diretamente e deixamos o módulo GNN retornar um relatório simulado.
+        report_data = gnn_module.analyze_network_for_risks(request.graph_snapshot)
+        
+        # O `report_data` retornado por gnn_module.analyze_network_for_risks é um Dict
+        # que já contém as chaves 'infection_spread_risk_nodes', 'resource_bottleneck_departments', 'recommendations'.
+        # Precisamos concatenar as listas de riscos se elas vierem separadas.
+        identified_risks_list = []
+        if "infection_spread_risk_nodes" in report_data:
+            identified_risks_list.extend(report_data["infection_spread_risk_nodes"])
+        if "resource_bottleneck_departments" in report_data:
+            identified_risks_list.extend(report_data["resource_bottleneck_departments"])
+
+        return NetworkAnalysisReportResponse(
+            analysis_type=request.analysis_type,
+            identified_risks=identified_risks_list,
+            recommendations=report_data.get("recommendations", []),
+            timestamp=datetime.now().isoformat()
+        )
+    except Exception as e:
+        logger.error(f"Erro ao analisar rede hospitalar com GNN: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro de análise de rede: {str(e)}")
+
+@app.get("/rl/formal_verification_reports", response_model=List[FormalVerificationReportSummary])
+async def get_formal_verification_reports():
+    """
+    Recupera os relatórios de verificação formal para a política de Aprendizado por Reforço,
+    garantindo a adesão às propriedades de segurança e ética.
+    """
+    if not vitalflow_config.FORMAL_VERIFICATION_ENABLED:
+        raise HTTPException(status_code=400, detail="A Verificação Formal não está habilitada na configuração do VitalFlow.")
+    
+    if not rl_optimizer.formal_verification_reports:
+        raise HTTPException(status_code=404, detail="Nenhum relatório de verificação formal encontrado.")
+    
+    # Converte cada dataclass FormalVerificationReport para o modelo Pydantic FormalVerificationReportSummary
+    return [FormalVerificationReportSummary(**report.__dict__) for report in rl_optimizer.formal_verification_reports]
+
+@app.get("/federated_learning/status")
+async def get_federated_learning_status():
+    """
+    Fornece o status atual do Orquestrador de Aprendizado Federado.
+    """
+    return {
+        "federated_learning_enabled": vitalflow_config.FEDERATED_LEARNING_ENABLED,
+        "orchestrator_active": federated_orchestrator.is_active,
+        "last_round_info": "Não implementado nesta demonstração, mas mostraria detalhes da última rodada de FL."
+    }
 
 @app.get("/models/status")
 async def get_model_status():
-    """Get status of all ML models"""
+    """Obtém o status de todos os modelos VitalFlow AI v5.0."""
     return {
-        "risk_classifier": ml_models['risk_classifier'] is not None,
-        "flow_predictor": ml_models['flow_predictor'] is not None,
-        "scalers_loaded": len(ml_models['scalers']),
-        "server_status": "active",
-        "last_trained": datetime.now().isoformat()
+        "causal_ai_trained": causal_ai.is_trained,
+        "digital_twin_trained": digital_twin.is_trained,
+        "rl_optimizer_trained": rl_optimizer.is_trained,
+        "gnn_module_trained": gnn_module.is_trained,
+        "federated_learning_orchestrator_active": federated_orchestrator.is_active,
+        "server_status": "ativo",
+        "last_status_check": datetime.now().isoformat()
     }
 
 if __name__ == "__main__":
+    # Garanta que o arquivo `advanced_models.py` esteja nomeado corretamente e no mesmo diretório
+    # ou acessível via PYTHONPATH.
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=True, # Recarrega para desenvolvimento, desabilite em produção
         log_level="info"
     )
