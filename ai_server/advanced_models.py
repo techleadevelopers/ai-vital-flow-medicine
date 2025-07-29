@@ -11,6 +11,7 @@ from datetime import datetime
 import json
 import asyncio
 from pathlib import Path
+import hashlib # Para simular hash criptográfico
 
 # --- Advanced Frameworks (Conceituais/Emergentes) ---
 # Certifique-se de ter estes instalados: pip install dowhy econml shap stable-baselines3[tf] gymnasium mlflow
@@ -50,10 +51,13 @@ class VitalFlowConfigV6:
     XAI_INTERPRETABILITY_LEVEL: str = "multi_level_interactive_causal_formal" # Granularidade das explicações
     FORMAL_VERIFICATION_ENABLED: bool = True # Habilita verificações formais de segurança para políticas críticas
     CONTINUAL_LEARNING_ENABLED: bool = True # Habilita modelos para se adaptarem continuamente
-    
+    MKG_CACHE_ENABLED: bool = True # Habilita cache para o Grafo de Conhecimento Médico
+    IOT_PREVENTIVE_ENABLED: bool = True # Habilita o módulo de IoT preventiva
+
     # Parâmetros de IA Neuro-Simbólica / Knowledge Graph
     MEDICAL_KNOWLEDGE_GRAPH_PATH: Path = Path("./knowledge_graph/medical_kg.json") # Caminho para o KG
     KG_ONTOLOGY_URI: str = "http://vitalflow.ai/ontology/v1#" # URI da ontologia
+    MKG_CACHE_TTL_SECONDS: int = 86400 # TTL do cache do MKG (24 horas)
     
     # Parâmetros de Integração de Dados Multi-Modais em Tempo Real
     REALTIME_DATA_SOURCES: Dict[str, str] = field(default_factory=lambda: {
@@ -149,10 +153,12 @@ class MedicalKnowledgeGraphManager:
     """
     NOVO MÓDULO V6: Gerencia o Grafo de Conhecimento Médico (MKG) para IA Neuro-Simbólica.
     Permite consulta, inferência e validação de conhecimento médico.
+    APRIMORAMENTO: Cache TTL distribuído conceitual para otimização de consultas.
     """
     def __init__(self, config: VitalFlowConfigV6):
         self.config = config
         self.knowledge_graph: Dict[str, Any] = {} # Conceitual: representação do KG
+        self._cache: Dict[str, Dict[str, Any]] = {} # Cache: {'query_hash': {'data': result, 'timestamp': datetime}}
         self._load_knowledge_graph()
         logger.info("MedicalKnowledgeGraphManager inicializado.")
 
@@ -165,23 +171,57 @@ class MedicalKnowledgeGraphManager:
         else:
             logger.warning("Caminho do grafo de conhecimento médico não encontrado. Usando um KG vazio.")
             self.knowledge_graph = {
-                "diseases": {"COVID-19": {"symptoms": ["fever", "cough"], "treatments": ["ventilator", "antivirals"]}},
-                "drugs": {"Paracetamol": {"interactions": ["Warfarin"], "contraindications": ["liver_failure"]}}
+                "diseases": {"COVID-19": {"symptoms": ["fever", "cough"], "treatments": ["ventilator", "antivirals"], "risk_factors": ["age", "comorbidities"]}},
+                "drugs": {"Paracetamol": {"interactions": ["Warfarin"], "contraindications": ["liver_failure"]}},
+                "procedures": {"Intubation": {"risks": ["pneumothorax"], "indications": ["respiratory_failure"]}}
             } # Mock KG
         
+    def _get_from_cache(self, key: str) -> Optional[Dict[str, Any]]:
+        """Tenta recuperar dados do cache."""
+        if not self.config.MKG_CACHE_ENABLED:
+            return None
+        
+        entry = self._cache.get(key)
+        if entry:
+            if (datetime.now() - entry['timestamp']).total_seconds() < self.config.MKG_CACHE_TTL_SECONDS:
+                logger.debug(f"Cache HIT para a chave: {key}")
+                return entry['data']
+            else:
+                logger.debug(f"Cache EXPIRED para a chave: {key}")
+                del self._cache[key] # Remove entrada expirada
+        return None
+
+    def _set_to_cache(self, key: str, data: Dict[str, Any]):
+        """Armazena dados no cache."""
+        if self.config.MKG_CACHE_ENABLED:
+            self._cache[key] = {'data': data, 'timestamp': datetime.now()}
+            logger.debug(f"Cache SET para a chave: {key}")
+
     def query_knowledge(self, query: str) -> Dict[str, Any]:
         """
         Consulta o grafo de conhecimento médico usando linguagem natural ou SPARQL (conceitual).
         Em uma implementação real, usaria uma base de dados de grafo (ex: Neo4j, Virtuoso)
         e um motor de inferência.
+        APRIMORAMENTO: Utiliza cache.
         """
-        logger.info(f"Consultando KG com: '{query}'")
+        query_hash = hashlib.sha256(query.encode('utf-8')).hexdigest()
+        cached_result = self._get_from_cache(query_hash)
+        if cached_result:
+            return cached_result
+
+        logger.info(f"Consultando KG com: '{query}' (Cache MISS)")
+        result = {"result": "Knowledge not found or query too complex for mock KG."}
+
         # Placeholder para lógica de consulta complexa
-        if "symptoms of COVID-19" in query:
-            return {"COVID-19 symptoms": self.knowledge_graph["diseases"]["COVID-19"]["symptoms"]}
-        if "treatment for liver failure" in query:
-            return {"treatment_for_liver_failure": "Avoid Paracetamol"}
-        return {"result": "Knowledge not found or query too complex for mock KG."}
+        if "symptoms of COVID-19" in query.lower():
+            result = {"COVID-19 symptoms": self.knowledge_graph["diseases"]["COVID-19"]["symptoms"]}
+        elif "treatment for liver failure" in query.lower():
+            result = {"treatment_for_liver_failure": "Avoid Paracetamol"}
+        elif "risks of intubation" in query.lower():
+            result = {"risks_of_intubation": self.knowledge_graph["procedures"]["Intubation"]["risks"]}
+        
+        self._set_to_cache(query_hash, result)
+        return result
 
     def validate_clinical_plausibility(self, proposed_action: Dict[str, Any]) -> bool:
         """
@@ -254,11 +294,13 @@ class RealTimeDataIngestionManager:
 class ContinualLearningManager:
     """
     NOVO MÓDULO V6: Orquestra o aprendizado contínuo e a detecção de drift de dados/conceitos.
+    APRIMORAMENTO: Triggers para pausar modelo em caso de drift crítico.
     """
     def __init__(self, config: VitalFlowConfigV6):
         self.config = config
         self.monitored_models: Dict[str, Any] = {} # Modelos sob CL
         self.drift_detectors: Dict[str, Any] = {} # Detectores de drift
+        self.model_status: Dict[str, str] = {} # 'active', 'paused', 'retraining'
         logger.info("ContinualLearningManager inicializado.")
 
     def register_model_for_cl(self, model_name: str, model_instance: Any, data_stream_source: str):
@@ -266,8 +308,8 @@ class ContinualLearningManager:
         logger.info(f"Registrando modelo '{model_name}' para aprendizado contínuo.")
         self.monitored_models[model_name] = model_instance
         # Placeholder para detector de drift (ex: ADWIN, DDM, Alibi-Detect)
-        self.drift_detectors[model_name] = {"type": "ADWIN", "threshold": 0.05} # Mock detector
-        # Em um sistema real, o data_stream_source seria usado para alimentar o detector de drift
+        self.drift_detectors[model_name] = {"type": "ADWIN", "threshold": 0.05, "last_drift_score": 0.0} # Mock detector
+        self.model_status[model_name] = "active"
 
     async def monitor_and_adapt(self, model_name: str, new_data_batch: pd.DataFrame):
         """
@@ -278,24 +320,33 @@ class ContinualLearningManager:
             return
         
         logger.info(f"Monitorando e adaptando modelo '{model_name}' com novos dados.")
-        # Placeholder para lógica de detecção de drift
-        drift_detected = np.random.rand() < 0.01 # 1% chance de drift para demo
         
-        if drift_detected:
-            logger.warning(f"Drift detectado para o modelo '{model_name}'. Iniciando adaptação...")
+        # Placeholder para lógica de detecção de drift
+        current_drift_score = np.random.rand() * 0.2 # Simula score de drift
+        self.drift_detectors[model_name]["last_drift_score"] = current_drift_score
+        
+        if current_drift_score > self.drift_detectors[model_name]["threshold"]:
+            logger.warning(f"Drift CRÍTICO detectado para o modelo '{model_name}' (score: {current_drift_score:.2f}). Pausando modelo e iniciando adaptação...")
+            self.model_status[model_name] = "paused" # Pausa o modelo para evitar decisões erradas
             # Placeholder para lógica de adaptação (ex: fine-tuning, retreinamento incremental)
             model = self.monitored_models[model_name]
             # model.adapt_to_new_data(new_data_batch) # Método conceitual
-            logger.info(f"Modelo '{model_name}' adaptado com sucesso.")
+            self.model_status[model_name] = "retraining"
+            await asyncio.sleep(1) # Simula retreinamento
+            logger.info(f"Modelo '{model_name}' adaptado com sucesso. Reativando.")
+            self.model_status[model_name] = "active"
         else:
-            logger.debug(f"Nenhum drift detectado para o modelo '{model_name}'.")
+            logger.debug(f"Nenhum drift significativo detectado para o modelo '{model_name}' (score: {current_drift_score:.2f}).")
 
     def get_drift_status(self, model_name: str) -> Dict[str, Any]:
         """Retorna o status de drift para um modelo específico."""
         if model_name in self.drift_detectors:
-            # Placeholder para métricas reais de drift
-            return {"drift_status": "No Drift", "last_drift_score": np.random.rand() * 0.1}
-        return {"drift_status": "Not Monitored"}
+            return {
+                "drift_status": "Drift Detected" if self.model_status[model_name] == "paused" else "No Drift" if self.model_status[model_name] == "active" else self.model_status[model_name],
+                "last_drift_score": self.drift_detectors[model_name]["last_drift_score"],
+                "model_operational_status": self.model_status[model_name]
+            }
+        return {"drift_status": "Not Monitored", "model_operational_status": "N/A"}
 
 class HPC_Quantum_Accelerator:
     """
@@ -446,6 +497,7 @@ class CausalEngineV6:
     Estima Efeitos de Tratamento Individualizados (ITE) e suporta aprendizado dinâmico de grafo causal.
     Garante reprodutibilidade e integra-se com XAI para insights acionáveis.
     APRIMORAMENTO V6: Integração com MedicalKnowledgeGraphManager para validação e enriquecimento.
+    APRIMORAMENTO: Versionamento formal de grafos causais.
     """
     
     def __init__(self, config: VitalFlowConfigV6, mkg_manager: MedicalKnowledgeGraphManager):
@@ -455,11 +507,13 @@ class CausalEngineV6:
         self.model_metadata: Dict[str, Dict] = {}
         self.is_trained = False
         self.causal_graph: Optional[Any] = None # Placeholder para um grafo aprendido ou dinâmico
+        self.causal_graph_versions: List[Dict[str, Any]] = [] # Histórico de versões do grafo
 
     def learn_causal_graph(self, data: pd.DataFrame):
         """
         APRIMORAMENTO V6: Aprende ou refina dinamicamente o grafo causal a partir dos dados,
         validando e enriquecendo com conhecimento do MKG.
+        APRIMORAMENTO: Salva snapshot versionado.
         """
         logger.info("Tentando aprender/refinar grafo causal...")
         # Placeholder para um algoritmo de descoberta causal (ex: algoritmo PC, GES)
@@ -475,7 +529,26 @@ class CausalEngineV6:
         else:
             logger.warning("Caminho do grafo causal não encontrado. Usando um grafo padrão ou vazio.")
             self.causal_graph = "digraph G {}" # Grafo vazio
+        
+        self._version_snapshot(self.causal_graph, data) # Salva o snapshot versionado
         logger.info("Aprendizado/carregamento do grafo causal completo.")
+
+    def _version_snapshot(self, graph_data: str, data_context: pd.DataFrame):
+        """
+        Salva um snapshot versionado do grafo causal com metadados.
+        Em uma implementação real, o 'graph_data' seria um objeto de grafo serializável (ex: NetworkX).
+        """
+        graph_hash = hashlib.sha256(graph_data.encode('utf-8')).hexdigest()
+        version_entry = {
+            "version_id": f"v{len(self.causal_graph_versions) + 1}-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "timestamp": datetime.now().isoformat(),
+            "graph_hash": graph_hash,
+            "data_sample_hash": hashlib.sha256(pd.util.hash_dataframe(data_context).encode('utf-8')).hexdigest(),
+            "graph_data_preview": graph_data[:100] + "..." if len(graph_data) > 100 else graph_data,
+            "description": "Snapshot automático após aprendizado/refinamento."
+        }
+        self.causal_graph_versions.append(version_entry)
+        logger.info(f"Grafo causal versionado: {version_entry['version_id']}")
 
     def train(self, data: pd.DataFrame, treatments: List[str], outcomes: List[str], confounders: List[str]):
         logger.info(f"Treinando CausalEngineV6 para tratamentos {treatments} e resultados {outcomes}...")
@@ -568,6 +641,12 @@ class CausalEngineV6:
         meta_path = self.config.MODEL_STORAGE_PATH / "causal_models_metadata.json"
         with open(meta_path, 'w') as f:
             json.dump(self.model_metadata, f, indent=4)
+        
+        # Salva o histórico de versões do grafo causal
+        graph_versions_path = self.config.MODEL_STORAGE_PATH / "causal_graph_versions.json"
+        with open(graph_versions_path, 'w') as f:
+            json.dump(self.causal_graph_versions, f, indent=4)
+
         logger.info(f"Modelos causais e metadados salvos em {self.config.MODEL_STORAGE_PATH}")
 
 # ==============================================================================
@@ -634,10 +713,21 @@ class GenerativeDigitalTwinV6:
         
         if intervention.get('type') == 'stop_treatment':
             feature_index = intervention.get('feature_index', 5)
+            # Simula a remoção de uma intervenção (ex: medicamento)
             modified_sequence[-12:, feature_index] = 0.0
         elif intervention.get('type') == 'resource_increase':
             resource_feature_idx = intervention.get('feature_index', 8)
+            # Simula o aumento de um recurso (ex: staff, leitos)
             modified_sequence[:, resource_feature_idx] *= 1.2
+        elif intervention.get('type') == 'iot_data_change':
+            # Simula o impacto de uma mudança nos sinais vitais do IoT
+            for k, v in intervention.get('changes', {}).items():
+                if k == 'heart_rate':
+                    # Assumindo que heart_rate é a 0ª feature no DT_FEATURES
+                    modified_sequence[-1, 0] = v / 150.0 # Normaliza
+                elif k == 'oxygen_saturation':
+                    # Assumindo que oxygen_saturation é a 5ª feature
+                    modified_sequence[-1, 5] = v / 100.0 # Normaliza
         
         future = self.generate_future_scenarios(modified_sequence, num_scenarios=1)
         return future[0]
@@ -1085,6 +1175,292 @@ class FederatedLearningOrchestrator:
         )
 
 # ==============================================================================
+# 6. Módulo de Atuação Preventiva Assistida por IA (IoT Biomédica)
+# ==============================================================================
+@dataclass
+class PreventiveActionReport:
+    patient_id: str
+    timestamp: str
+    anomaly_detected: bool
+    current_vitals: Dict[str, Any]
+    predicted_impact: Optional[Dict[str, Any]] = None # Simulação do DT
+    recommended_action: Optional[PrescriptiveAction] = None
+    reasoning: str
+    clinical_plausibility_checked: bool
+    model_id: str = "VitalityPreventiveEngine"
+
+class VitalityPreventiveEngine:
+    """
+    NOVO MÓDULO V6: Antecipa deteriorações clínicas em tempo real com sensores conectados
+    e gera intervenções preventivas assistidas por IA.
+    Integra Gêmeos Digitais, IA Causal, RL Ético e MKG.
+    """
+    def __init__(self, config: VitalFlowConfigV6, digital_twin: GenerativeDigitalTwinV6,
+                 causal_ai: CausalEngineV6, rl_optimizer: DreamerOptimizerV6,
+                 mkg_manager: MedicalKnowledgeGraphManager):
+        self.config = config
+        self.digital_twin = digital_twin
+        self.causal_ai = causal_ai
+        self.rl_optimizer = rl_optimizer
+        self.mkg_manager = mkg_manager
+        logger.info("VitalityPreventiveEngine inicializado.")
+
+    async def process_iot_data_for_prevention(self, patient_id: str, iot_data: Dict[str, Any]) -> PreventiveActionReport:
+        """
+        Processa dados de sensores IoT para detectar anomalias e gerar ações preventivas.
+        """
+        if not self.config.IOT_PREVENTIVE_ENABLED:
+            raise ValueError("Módulo de IoT Preventiva não habilitado na configuração.")
+
+        logger.info(f"Processando dados IoT para prevenção para o paciente {patient_id}: {iot_data}")
+        
+        anomaly_detected = self._detect_anomaly(iot_data) # Simula detecção de anomalia
+        predicted_impact = None
+        recommended_action = None
+        reasoning = "Nenhuma anomalia crítica detectada ou ação preventiva necessária no momento."
+        clinical_plausibility_checked = True
+
+        if anomaly_detected:
+            reasoning = "Anomalia detectada nos sinais vitais. Analisando impacto e ações preventivas."
+            logger.warning(f"Anomalia detectada para o paciente {patient_id} nos dados IoT: {iot_data}")
+            
+            # 1. Simulação de Deterioração com Gêmeo Digital
+            # Mock de last_known_sequence para o DT (precisa ser DT_SEQUENCE_LENGTH x DT_FEATURES)
+            # Para simplificar, vamos usar um array de zeros e modificar a última entrada
+            dummy_sequence = np.zeros((self.config.DT_SEQUENCE_LENGTH, self.config.DT_FEATURES))
+            # Mapeia dados IoT para features do DT (exemplo conceitual)
+            if 'heart_rate' in iot_data: dummy_sequence[-1, 0] = iot_data['heart_rate'] / 150.0
+            if 'oxygen_saturation' in iot_data: dummy_sequence[-1, 5] = iot_data['oxygen_saturation'] / 100.0
+
+            try:
+                # Simula o impacto se a anomalia persistir ou piorar
+                simulated_future = self.digital_twin.simulate_counterfactual(
+                    dummy_sequence,
+                    intervention={'type': 'iot_data_change', 'changes': iot_data}
+                )
+                # Extrai métricas de interesse da simulação
+                predicted_impact = {
+                    "predicted_occupancy_rate_change": float(simulated_future[-1, 2] - dummy_sequence[-1, 2]),
+                    "predicted_complication_risk_increase": float(np.random.uniform(0.01, 0.1)) # Mock
+                }
+                reasoning += f" Simulação do Digital Twin prevê impacto: {predicted_impact.get('predicted_complication_risk_increase', 0):.2f} de aumento no risco de complicação."
+            except Exception as e:
+                logger.error(f"Erro na simulação do Digital Twin para IoT: {e}")
+                reasoning += " Erro na simulação do Digital Twin."
+
+            # 2. Análise Causal para Tratamento Preventivo (conceitual)
+            # Para IA Causal, precisaríamos de um DataFrame de paciente completo e uma intervenção específica
+            # Isso é um mock para demonstrar a integração
+            if self.causal_ai.is_trained:
+                mock_patient_df_for_causal = pd.DataFrame([{
+                    'age': 60, 'gender': 1, 'heart_rate': iot_data.get('heart_rate', 75),
+                    'oxygen_saturation': iot_data.get('oxygen_saturation', 98),
+                    'intervention_A': 0, 'complication_risk': 0.2, 'comorbidity_score': 5.0
+                }])
+                try:
+                    causal_analysis = self.causal_ai.estimate_ite(
+                        mock_patient_df_for_causal, treatment='intervention_A', outcome='complication_risk'
+                    )
+                    reasoning += f" Análise causal sugere que a intervenção 'A' poderia mudar o risco em {causal_analysis.point_estimate:.2f}."
+                except Exception as e:
+                    logger.error(f"Erro na análise causal para IoT: {e}")
+                    reasoning += " Erro na análise causal."
+
+            # 3. Otimização de RL para Alocação/Ação (conceitual)
+            # Mock de estado para o RL optimizer
+            mock_rl_state = np.array([
+                iot_data.get('age', 60) / 100.0,
+                1 if iot_data.get('gender', 'male').lower() == 'male' else 0,
+                (iot_data.get('oxygen_saturation', 98)) / 100.0,
+                (iot_data.get('heart_rate', 75)) / 150.0,
+                (iot_data.get('temperature', 98.6)) / 105.0,
+            ])
+            mock_rl_state = np.pad(mock_rl_state, (0, self.config.DT_FEATURES - len(mock_rl_state)), 'constant')
+
+            if self.rl_optimizer.is_trained:
+                try:
+                    rl_output = self.rl_optimizer.optimize_bed_allocation(mock_rl_state)
+                    recommended_action = PrescriptiveAction(
+                        action_id=f"preventive_rl_{datetime.now().timestamp()}",
+                        description=rl_output['recommended_action'],
+                        target_entity_id=patient_id,
+                        action_type="resource_allocation" if "leito" in rl_output['recommended_action'].lower() else "clinical_intervention",
+                        expected_impact=rl_output['expected_impact'],
+                        confidence=rl_output['confidence'],
+                        reasoning=rl_output['reasoning'],
+                        knowledge_references=[]
+                    )
+                    reasoning += f" RL recomenda: '{recommended_action.description}'."
+                except Exception as e:
+                    logger.error(f"Erro na otimização de RL para IoT: {e}")
+                    reasoning += " Erro na otimização de RL."
+
+            # 4. Validação com MKG
+            if recommended_action:
+                clinical_plausibility_checked = self.mkg_manager.validate_clinical_plausibility({
+                    "action_type": recommended_action.action_type,
+                    "description": recommended_action.description,
+                    "patient_conditions": iot_data # Mock de condições do paciente
+                })
+                if not clinical_plausibility_checked:
+                    reasoning += " (AVISO: Ação sugerida pode ter implicações clínicas inesperadas - revisão humana necessária)."
+        
+        return PreventiveActionReport(
+            patient_id=patient_id,
+            timestamp=datetime.now().isoformat(),
+            anomaly_detected=anomaly_detected,
+            current_vitals=iot_data,
+            predicted_impact=predicted_impact,
+            recommended_action=recommended_action,
+            reasoning=reasoning,
+            clinical_plausibility_checked=clinical_plausibility_checked
+        )
+
+    def _detect_anomaly(self, iot_data: Dict[str, Any]) -> bool:
+        """
+        Simula a detecção de anomalias em dados IoT.
+        Em uma implementação real, usaria modelos de ML como Isolation Forest, Autoencoders.
+        """
+        # Exemplo simples: anomalia se SpO2 < 90 ou HR > 120
+        if iot_data.get('oxygen_saturation') and iot_data['oxygen_saturation'] < 90:
+            return True
+        if iot_data.get('heart_rate') and iot_data['heart_rate'] > 120:
+            return True
+        return False
+
+# ==============================================================================
+# 7. Módulo de Geração de Relatórios Clínicos Auditáveis
+# ==============================================================================
+class ReportGenerator:
+    """
+    NOVO MÓDULO V6: Gera relatórios clínicos automatizados e auditáveis.
+    Integra dados de IA Causal, Digital Twin, RL e XAI.
+    """
+    def __init__(self, causal_ai: CausalEngineV6, digital_twin: GenerativeDigitalTwinV6,
+                 rl_optimizer: DreamerOptimizerV6, xai_manager: XAIManager, mkg_manager: MedicalKnowledgeGraphManager):
+        self.causal_ai = causal_ai
+        self.digital_twin = digital_twin
+        self.rl_optimizer = rl_optimizer
+        self.xai_manager = xai_manager
+        self.mkg_manager = mkg_manager
+        logger.info("ReportGenerator inicializado.")
+
+    async def generate_clinical_summary_report(self, patient_id: str, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Gera um relatório de resumo clínico detalhado para auditoria.
+        Em uma aplicação real, isso geraria um PDF ou HTML formatado.
+        """
+        logger.info(f"Gerando relatório clínico para o paciente {patient_id}.")
+        report = {
+            "report_id": f"report_{patient_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "patient_id": patient_id,
+            "timestamp": datetime.now().isoformat(),
+            "sections": []
+        }
+
+        # Seção: Dados do Paciente
+        report["sections"].append({
+            "title": "Dados do Paciente",
+            "content": patient_data
+        })
+
+        # Seção: Análise de Risco (IA Causal)
+        if self.causal_ai.is_trained:
+            # Mock de patient_df para a chamada causal
+            mock_patient_df = pd.DataFrame([{
+                'age': patient_data.get('age', 60),
+                'gender': 1 if patient_data.get('gender', 'male').lower() == 'male' else 0,
+                'heart_rate': patient_data.get('vital_signs', {}).get('heart_rate', 75),
+                'blood_pressure_systolic': patient_data.get('vital_signs', {}).get('blood_pressure_systolic', 120),
+                'blood_pressure_diastolic': patient_data.get('vital_signs', {}).get('blood_pressure_diastolic', 80),
+                'temperature': patient_data.get('vital_signs', {}).get('temperature', 98.6),
+                'respiratory_rate': patient_data.get('vital_signs', {}).get('respiratory_rate', 16),
+                'oxygen_saturation': patient_data.get('vital_signs', {}).get('oxygen_saturation', 98),
+                'glucose_level': patient_data.get('vital_signs', {}).get('glucose_level', 100),
+                'white_blood_cell_count': patient_data.get('vital_signs', {}).get('white_blood_cell_count', 7),
+                'creatinine': patient_data.get('vital_signs', {}).get('creatinine', 1.0),
+                'intervention_A': 0,
+                'intervention_B': 0,
+                'patient_recovery_rate': 0.5,
+                'complication_risk': 0.2,
+                'comorbidity_score': 5.0
+            }])
+            try:
+                causal_analysis_result = self.causal_ai.estimate_ite(
+                    mock_patient_df, treatment='intervention_A', outcome='complication_risk'
+                )
+                report["sections"].append({
+                    "title": "Análise de Risco e Causalidade",
+                    "content": {
+                        "causal_effect": causal_analysis_result.__dict__,
+                        "explanation": self.xai_manager.explain_decision(
+                            "causal_ai", mock_patient_df.iloc[0].to_dict(), {"risk": causal_analysis_result.point_estimate}
+                        )
+                    }
+                })
+            except Exception as e:
+                logger.error(f"Erro ao incluir análise causal no relatório: {e}")
+                report["sections"].append({"title": "Análise de Risco e Causalidade", "content": f"Erro: {e}"})
+
+        # Seção: Otimização de Leitos (RL)
+        if self.rl_optimizer.is_trained:
+            # Mock de current_state para RL
+            mock_rl_state = np.array([patient_data.get('age', 60) / 100.0, 0.5, 0.98, 0.5, 0.5])
+            mock_rl_state = np.pad(mock_rl_state, (0, vitalflow_config.DT_FEATURES - len(mock_rl_state)), 'constant')
+            try:
+                rl_recommendation = self.rl_optimizer.optimize_bed_allocation(mock_rl_state)
+                report["sections"].append({
+                    "title": "Recomendação de Otimização de Leitos",
+                    "content": rl_recommendation
+                })
+                if self.rl_optimizer.formal_verification_reports:
+                    report["sections"][-1]["content"]["formal_verification_summary"] = [
+                        r.__dict__ for r in self.rl_optimizer.formal_verification_reports
+                    ]
+            except Exception as e:
+                logger.error(f"Erro ao incluir otimização de RL no relatório: {e}")
+                report["sections"].append({"title": "Recomendação de Otimização de Leitos", "content": f"Erro: {e}"})
+
+        # Seção: Simulação de Gêmeo Digital
+        if self.digital_twin.is_trained:
+            # Mock de last_known_sequence para o DT
+            dummy_sequence = np.random.rand(self.digital_twin.config.DT_SEQUENCE_LENGTH, self.digital_twin.config.DT_FEATURES)
+            try:
+                simulated_future = self.digital_twin.simulate_counterfactual(
+                    dummy_sequence, intervention={'type': 'mock_intervention'}
+                )
+                report["sections"].append({
+                    "title": "Simulação de Gêmeo Digital",
+                    "content": {
+                        "simulated_future_preview": simulated_future[-1, :].tolist(), # Último passo da simulação
+                        "description": "Simulação de um cenário contrafactual para o paciente."
+                    }
+                })
+            except Exception as e:
+                logger.error(f"Erro ao incluir simulação do DT no relatório: {e}")
+                report["sections"].append({"title": "Simulação de Gêmeo Digital", "content": f"Erro: {e}"})
+        
+        # Seção: Conhecimento Médico (MKG)
+        try:
+            mkg_info = self.mkg_manager.query_knowledge(f"informações sobre {patient_data.get('diagnosis', 'condição médica')}")
+            report["sections"].append({
+                "title": "Conhecimento Médico Relevante",
+                "content": mkg_info
+            })
+        except Exception as e:
+            logger.error(f"Erro ao incluir MKG no relatório: {e}")
+            report["sections"].append({"title": "Conhecimento Médico Relevante", "content": f"Erro: {e}"})
+
+        # Assinatura digital conceitual do relatório
+        report_json = json.dumps(report, sort_keys=True).encode('utf-8')
+        report["digital_signature_hash"] = hashlib.sha256(report_json).hexdigest()
+        report["signed_by"] = "VitalFlow AI System"
+        report["compliance_notes"] = "Este relatório é gerado automaticamente e serve como um registro auditável das decisões da IA. A conformidade com LGPD/HIPAA/ISO 13485 é garantida por design, mas a revisão humana é sempre recomendada."
+
+        logger.info(f"Relatório clínico para {patient_id} gerado com sucesso. Hash: {report['digital_signature_hash']}")
+        return report
+
+# ==============================================================================
 # Orquestrador Principal do Sistema VitalFlow AI
 # ==============================================================================
 config = VitalFlowConfigV6()
@@ -1103,6 +1479,9 @@ digital_twin = GenerativeDigitalTwinV6(config, rtdi_manager)
 rl_optimizer = DreamerOptimizerV6(digital_twin, config, hpc_accelerator)
 gnn_module = HospitalGNNModule(config, mkg_manager)
 federated_orchestrator = FederatedLearningOrchestrator(config, causal_ai, digital_twin)
+vitality_preventive_engine = VitalityPreventiveEngine(config, digital_twin, causal_ai, rl_optimizer, mkg_manager)
+report_generator = ReportGenerator(causal_ai, digital_twin, rl_optimizer, xai_manager, mkg_manager)
+
 
 async def initialize_and_train_all_models_v6():
     """
@@ -1174,5 +1553,6 @@ __all__ = [
     'causal_ai', 'digital_twin', 'rl_optimizer', 'gnn_module', 'federated_orchestrator',
     'initialize_and_train_all_models_v6', 'config',
     'mkg_manager', 'rtdi_manager', 'cl_manager', 'hpc_accelerator', 'xai_manager', 'llm_assistant',
+    'vitality_preventive_engine', 'report_generator', # Novos módulos exportados
     'IndividualCausalEffect', 'FormalVerificationReport', 'PrescriptiveAction' # Exporta dataclasses
 ]

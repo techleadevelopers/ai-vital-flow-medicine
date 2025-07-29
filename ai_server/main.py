@@ -1,7 +1,5 @@
-# main.py - VitalFlow AI v6.0 Server
-# Esta versão integra os modelos ultra-avançados do advanced_models.py (VitalFlow AI v6.0)
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Body
+import hashlib # Para simular hash criptográfico
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional, Tuple, Union
@@ -21,10 +19,11 @@ warnings.filterwarnings('ignore')
 from advanced_models import (
     causal_ai, digital_twin, rl_optimizer, gnn_module, federated_orchestrator,
     initialize_and_train_all_models_v6, config as vitalflow_config,
-    mkg_manager, rtdi_manager, cl_manager, hpc_accelerator, xai_manager, llm_assistant
+    mkg_manager, rtdi_manager, cl_manager, hpc_accelerator, xai_manager, llm_assistant,
+    vitality_preventive_engine, report_generator # Novos módulos importados
 )
 # Importa dataclasses específicas para uso nos modelos Pydantic de resposta
-from advanced_models import IndividualCausalEffect, FormalVerificationReport, PrescriptiveAction
+from advanced_models import IndividualCausalEffect, FormalVerificationReport, PrescriptiveAction, PreventiveActionReport
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +44,70 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Funções Auxiliares para Logs Criptográficos e Fallbacks ---
+def _log_decision_cryptographically(model_id: str, input_data: Dict[str, Any], output_data: Dict[str, Any], explanation: Optional[Dict[str, Any]] = None):
+    """
+    Simula o registro de uma decisão da IA com metadados para auditoria e integridade.
+    Em um sistema real, isso seria persistido em um log imutável (ex: blockchain, append-only database).
+    """
+    timestamp = datetime.now().isoformat()
+    log_entry = {
+        "timestamp": timestamp,
+        "model_id": model_id,
+        "input_hash": hashlib.sha256(json.dumps(input_data, sort_keys=True).encode('utf-8')).hexdigest(),
+        "output_hash": hashlib.sha256(json.dumps(output_data, sort_keys=True).encode('utf-8')).hexdigest(),
+        "explanation_hash": hashlib.sha256(json.dumps(explanation, sort_keys=True).encode('utf-8')).hexdigest() if explanation else None,
+        "decision_details": output_data, # Inclui a saída para facilitar a consulta
+        "log_entry_hash": None # Será preenchido após criar o hash de toda a entrada
+    }
+    # Calcula o hash da própria entrada para garantir a integridade do log
+    log_entry["log_entry_hash"] = hashlib.sha256(json.dumps(log_entry, sort_keys=True).encode('utf-8')).hexdigest()
+    
+    logger.info(f"DECISION_LOG: Model={model_id}, Timestamp={timestamp}, LogHash={log_entry['log_entry_hash']}")
+    # Em produção, este log seria enviado para um sistema de persistência auditável.
+    # Ex: db.save_auditable_log(log_entry)
+
+class ModelFallbackManager:
+    """
+    Gerencia estratégias de fallback para modelos de IA em caso de falha ou indisponibilidade.
+    Conceitual: Em produção, poderia carregar modelos de fallback pré-treinados ou usar regras heurísticas.
+    """
+    def __init__(self):
+        logger.info("ModelFallbackManager inicializado.")
+
+    def get_risk_prediction_fallback(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback para predição de risco."""
+        age = patient_data.get('age', 50)
+        hr = patient_data.get('vital_signs', {}).get('heart_rate', 75)
+        o2sat = patient_data.get('vital_signs', {}).get('oxygen_saturation', 98)
+        
+        risk = 0
+        factors = ["Fallback: Modelo principal indisponível."]
+        if age > 70: risk += 20; factors.append("Idade avançada")
+        if hr > 100 or hr < 60: risk += 15; factors.append("Frequência cardíaca anormal")
+        if o2sat < 92: risk += 30; factors.append("Saturação de oxigênio baixa")
+        
+        return {
+            "overall_risk_score": float(min(risk, 100)),
+            "risk_factors_identified": factors,
+            "recommendation": "Avaliação manual urgente necessária devido à indisponibilidade do modelo de IA.",
+            "causal_analysis": None,
+            "model_confidence": 0.3,
+            "xai_explanation_link": None
+        }
+
+    def get_bed_optimization_fallback(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Fallback para otimização de leitos."""
+        return {
+            "recommended_action": "Alocação de leito padrão (enfermaria geral)",
+            "reasoning": "Fallback: Otimizador de RL indisponível. Recomenda-se alocação padrão.",
+            "priority": 4,
+            "confidence": 0.2,
+            "expected_impact": {"status": "indisponível"}
+        }
+
+fallback_manager = ModelFallbackManager()
 
 # --- Modelos Pydantic para a API V6 ---
 
@@ -184,6 +247,7 @@ class ContinualLearningStatus(BaseModel):
     drift_status: str
     last_drift_score: Optional[float] = None
     last_adaptation_time: Optional[str] = None
+    model_operational_status: str # Adicionado para refletir o status real do modelo (active, paused, retraining)
 
 class HPCAccelerationRequest(BaseModel):
     problem_description: Dict[str, Any]
@@ -195,6 +259,40 @@ class HPCAccelerationResponse(BaseModel):
     simulation_results: Optional[Dict[str, Any]] = None
     method: str
     speed_up_factor: Optional[float] = None
+
+# --- Novos modelos Pydantic para IoT Biomédica ---
+class IoTSensorData(BaseModel):
+    patient_id: str = Field(..., description="ID do paciente associado aos dados do sensor.")
+    device_id: str = Field(..., description="ID do dispositivo IoT.")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), description="Timestamp da leitura do sensor.")
+    heart_rate: Optional[float] = Field(None, description="Frequência cardíaca (bpm).")
+    oxygen_saturation: Optional[float] = Field(None, description="Saturação de oxigênio (%).")
+    temperature: Optional[float] = Field(None, description="Temperatura corporal (°C).")
+    respiratory_rate: Optional[float] = Field(None, description="Frequência respiratória (resp/min).")
+    blood_pressure_systolic: Optional[float] = Field(None, description="Pressão arterial sistólica (mmHg).")
+    blood_pressure_diastolic: Optional[float] = Field(None, description="Pressão arterial diastólica (mmHg).")
+    # Adicione outros campos de sensor conforme necessário
+
+class PreventiveActionReportResponse(BaseModel): # Mapeia a dataclass PreventiveActionReport
+    patient_id: str
+    timestamp: str
+    anomaly_detected: bool
+    current_vitals: Dict[str, Any]
+    predicted_impact: Optional[Dict[str, Any]] = None
+    recommended_action: Optional[PrescriptiveActionResponse] = None
+    reasoning: str
+    clinical_plausibility_checked: bool
+    model_id: str
+
+# --- Novo modelo Pydantic para Relatório Clínico Auditável ---
+class ClinicalSummaryReportResponse(BaseModel):
+    report_id: str
+    patient_id: str
+    timestamp: str
+    sections: List[Dict[str, Any]]
+    digital_signature_hash: str
+    signed_by: str
+    compliance_notes: str
 
 @app.on_event("startup")
 async def startup_event():
@@ -225,7 +323,9 @@ async def root():
             "cl_manager_initialized": True, # Always initialized, but models registered later
             "hpc_accelerator_initialized": True,
             "xai_manager_initialized": True,
-            "llm_assistant_initialized": True
+            "llm_assistant_initialized": True,
+            "vitality_preventive_engine_initialized": True,
+            "report_generator_initialized": True
         }
     }
 
@@ -234,9 +334,22 @@ async def predict_patient_risk(patient: PatientDataV6):
     """
     Prediz o risco do paciente usando IA Causal, fornecendo Efeitos de Tratamento Individualizados (ITE)
     e explicações contrafactuais, enriquecidas por conhecimento médico formal.
+    APRIMORAMENTO: Log criptográfico da decisão.
     """
     if not causal_ai.is_trained:
-        raise HTTPException(status_code=503, detail="Modelo de IA Causal ainda não treinado ou carregado.")
+        # Fallback se o modelo principal não estiver treinado
+        logger.warning("Modelo de IA Causal não treinado. Usando fallback para predição de risco.")
+        fallback_prediction = fallback_manager.get_risk_prediction_fallback(patient.dict())
+        _log_decision_cryptographically("causal_ai_fallback", patient.dict(), fallback_prediction)
+        return RiskPredictionV6(patient_id=patient.patient_id, **fallback_prediction)
+
+    # Verifica o status operacional do modelo via CL Manager
+    cl_status = cl_manager.get_drift_status("causal_ai")
+    if cl_status.get("model_operational_status") == "paused":
+        logger.warning("Modelo de IA Causal pausado devido a drift. Usando fallback para predição de risco.")
+        fallback_prediction = fallback_manager.get_risk_prediction_fallback(patient.dict())
+        _log_decision_cryptographically("causal_ai_paused_fallback", patient.dict(), fallback_prediction)
+        return RiskPredictionV6(patient_id=patient.patient_id, **fallback_prediction)
 
     try:
         patient_df = pd.DataFrame([{
@@ -278,7 +391,7 @@ async def predict_patient_risk(patient: PatientDataV6):
         # Link para explicação XAI detalhada (conceitual)
         xai_link = f"/xai/explain_decision?model_name=causal_ai&patient_id={patient.patient_id}"
 
-        return RiskPredictionV6(
+        response_data = RiskPredictionV6(
             patient_id=patient.patient_id,
             overall_risk_score=float(overall_risk_score),
             risk_factors_identified=risk_factors,
@@ -287,9 +400,14 @@ async def predict_patient_risk(patient: PatientDataV6):
             model_confidence=model_confidence,
             xai_explanation_link=xai_link
         )
+        _log_decision_cryptographically("causal_ai_risk_prediction", patient.dict(), response_data.dict())
+        return response_data
     except Exception as e:
         logger.error(f"Erro ao predizer risco com IA Causal: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro de predição: {str(e)}")
+        # Fallback em caso de erro durante a execução do modelo
+        fallback_prediction = fallback_manager.get_risk_prediction_fallback(patient.dict())
+        _log_decision_cryptographically("causal_ai_error_fallback", patient.dict(), fallback_prediction)
+        return RiskPredictionV6(patient_id=patient.patient_id, **fallback_prediction)
 
 @app.get("/predict/flow", response_model=List[PatientFlowScenario])
 async def predict_patient_flow(num_scenarios: int = 3):
@@ -299,6 +417,10 @@ async def predict_patient_flow(num_scenarios: int = 3):
     """
     if not digital_twin.is_trained:
         raise HTTPException(status_code=503, detail="Modelo Digital Twin ainda não treinado ou carregado.")
+
+    cl_status = cl_manager.get_drift_status("digital_twin")
+    if cl_status.get("model_operational_status") == "paused":
+        raise HTTPException(status_code=503, detail="Modelo Digital Twin pausado devido a drift. Tente novamente mais tarde.")
 
     try:
         dummy_last_known_sequence = np.random.rand(vitalflow_config.DT_SEQUENCE_LENGTH, vitalflow_config.DT_FEATURES)
@@ -337,6 +459,7 @@ async def predict_patient_flow(num_scenarios: int = 3):
                 uncertainty_quantification=uncertainty
             ))
         
+        _log_decision_cryptographically("digital_twin_flow_prediction", {"num_scenarios": num_scenarios}, [s.dict() for s in scenarios])
         return scenarios
         
     except Exception as e:
@@ -348,9 +471,26 @@ async def optimize_bed_allocation(patients: List[PatientDataV6]):
     """
     Otimiza a alocação de leitos usando o Otimizador de Aprendizado por Reforço,
     considerando restrições éticas e fornecendo recomendações acionáveis.
+    APRIMORAMENTO: Log criptográfico da decisão e fallback.
     """
     if not rl_optimizer.is_trained:
-        raise HTTPException(status_code=503, detail="Otimizador de RL ainda não treinado ou carregado.")
+        logger.warning("Otimizador de RL não treinado. Usando fallback para otimização de leitos.")
+        optimizations = []
+        for patient in patients:
+            fallback_opt = fallback_manager.get_bed_optimization_fallback(patient.dict())
+            optimizations.append(BedOptimizationV6(patient_id=patient.patient_id, **fallback_opt))
+        _log_decision_cryptographically("rl_optimizer_fallback", [p.dict() for p in patients], [o.dict() for o in optimizations])
+        return optimizations
+
+    cl_status = cl_manager.get_drift_status("rl_optimizer")
+    if cl_status.get("model_operational_status") == "paused":
+        logger.warning("Otimizador de RL pausado devido a drift. Usando fallback para otimização de leitos.")
+        optimizations = []
+        for patient in patients:
+            fallback_opt = fallback_manager.get_bed_optimization_fallback(patient.dict())
+            optimizations.append(BedOptimizationV6(patient_id=patient.patient_id, **fallback_opt))
+        _log_decision_cryptographically("rl_optimizer_paused_fallback", [p.dict() for p in patients], [o.dict() for o in optimizations])
+        return optimizations
 
     try:
         optimizations = []
@@ -384,11 +524,18 @@ async def optimize_bed_allocation(patients: List[PatientDataV6]):
                 formal_verification_status=formal_status
             ))
         
+        _log_decision_cryptographically("rl_optimizer_bed_allocation", [p.dict() for p in patients], [o.dict() for o in optimizations])
         return optimizations
         
     except Exception as e:
         logger.error(f"Erro ao otimizar leitos com Otimizador de RL: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro de otimização de leitos: {str(e)}")
+        # Fallback em caso de erro durante a execução do modelo
+        optimizations = []
+        for patient in patients:
+            fallback_opt = fallback_manager.get_bed_optimization_fallback(patient.dict())
+            optimizations.append(BedOptimizationV6(patient_id=patient.patient_id, **fallback_opt))
+        _log_decision_cryptographically("rl_optimizer_error_fallback", [p.dict() for p in patients], [o.dict() for o in optimizations])
+        return optimizations
 
 @app.post("/digital_twin/predict_equipment_failure", response_model=EquipmentFailurePrediction)
 async def predict_equipment_failure(equipment_data: EquipmentData):
@@ -400,6 +547,10 @@ async def predict_equipment_failure(equipment_data: EquipmentData):
         raise HTTPException(status_code=400, detail="A manutenção preditiva não está habilitada na configuração do VitalFlow.")
     if 'equipment' not in digital_twin.multi_scale_models:
         raise HTTPException(status_code=503, detail="Modelo Digital Twin de equipamento não treinado ou carregado.")
+
+    cl_status = cl_manager.get_drift_status("digital_twin")
+    if cl_status.get("model_operational_status") == "paused":
+        raise HTTPException(status_code=503, detail="Modelo Digital Twin pausado devido a drift. Tente novamente mais tarde.")
 
     try:
         num_features_per_step = len(equipment_data.sensor_data) // equipment_data.sequence_length
@@ -419,13 +570,15 @@ async def predict_equipment_failure(equipment_data: EquipmentData):
             target_entity_id=equipment_data.equipment_id
         )
 
-        return EquipmentFailurePrediction(
+        response_data = EquipmentFailurePrediction(
             equipment_id=equipment_data.equipment_id,
             failure_probability=failure_prob,
             recommendation=recommendation,
             confidence=0.85, # Placeholder
             prescriptive_action=PrescriptiveActionResponse(**prescriptive_action_output.__dict__)
         )
+        _log_decision_cryptographically("digital_twin_equipment_failure", equipment_data.dict(), response_data.dict())
+        return response_data
     except Exception as e:
         logger.error(f"Erro ao predizer falha de equipamento: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro de predição de falha de equipamento: {str(e)}")
@@ -439,16 +592,22 @@ async def analyze_hospital_network(request: NetworkAnalysisRequest):
     if not gnn_module.is_trained:
         raise HTTPException(status_code=503, detail="Módulo GNN não treinado ou carregado.")
 
+    cl_status = cl_manager.get_drift_status("gnn_module")
+    if cl_status.get("model_operational_status") == "paused":
+        raise HTTPException(status_code=503, detail="Módulo GNN pausado devido a drift. Tente novamente mais tarde.")
+
     try:
         report_data = gnn_module.analyze_network_for_risks(request.graph_snapshot, request.analysis_type)
         
-        return NetworkAnalysisReportResponse(
+        response_data = NetworkAnalysisReportResponse(
             analysis_type=report_data.get("analysis_type", request.analysis_type),
             identified_risks=report_data.get("identified_risks", []),
             recommendations=report_data.get("recommendations", []),
             timestamp=datetime.now().isoformat(),
             knowledge_references=[] # O GNN Module já pode retornar isso no report_data
         )
+        _log_decision_cryptographically("gnn_network_analysis", request.dict(), response_data.dict())
+        return response_data
     except Exception as e:
         logger.error(f"Erro ao analisar rede hospitalar com GNN: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro de análise de rede: {str(e)}")
@@ -493,13 +652,17 @@ async def ingest_realtime_data(data_point: RealTimeDataPoint):
         # await digital_twin.update_real_time_data(harmonized_data, data_point.source_type)
         
         # APRIMORAMENTO V6: Aciona monitoramento de drift para modelos relevantes
-        # cl_manager.monitor_and_adapt("digital_twin", pd.DataFrame([harmonized_data])) # Mock
+        if vitalflow_config.CONTINUAL_LEARNING_ENABLED:
+            # cl_manager.monitor_and_adapt("digital_twin", pd.DataFrame([harmonized_data])) # Mock
+            pass
         
-        return RealTimeDataIngestionResponse(
+        response_data = RealTimeDataIngestionResponse(
             status="success",
             harmonized_data_preview=harmonized_data,
             timestamp=datetime.now().isoformat()
         )
+        _log_decision_cryptographically("rtdi_ingestion", data_point.dict(), response_data.dict())
+        return response_data
     except Exception as e:
         logger.error(f"Erro na ingestão de dados em tempo real: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro na ingestão de dados: {str(e)}")
@@ -511,6 +674,7 @@ async def explain_decision(model_name: str = Body(...), data_point: Dict[str, An
     """
     try:
         explanation = xai_manager.explain_decision(model_name, data_point, prediction)
+        _log_decision_cryptographically("xai_explanation", {"model_name": model_name, "data_point": data_point, "prediction": prediction}, explanation)
         return XAIExplanationResponse(**explanation)
     except Exception as e:
         logger.error(f"Erro ao gerar explicação XAI: {str(e)}", exc_info=True)
@@ -523,6 +687,7 @@ async def llm_query(request: LLMQueryRequest):
     """
     try:
         response = await llm_assistant.process_natural_language_query(request.query, {"patient_id": request.patient_id, **(request.context or {})})
+        _log_decision_cryptographically("llm_query", request.dict(), response)
         return LLMQueryResponse(**response)
     except Exception as e:
         logger.error(f"Erro na consulta LLM: {str(e)}", exc_info=True)
@@ -535,6 +700,7 @@ async def knowledge_graph_query(request: KnowledgeGraphQueryRequest):
     """
     try:
         results = mkg_manager.query_knowledge(request.query)
+        _log_decision_cryptographically("mkg_query", request.dict(), results)
         return KnowledgeGraphQueryResponse(query=request.query, results=results)
     except Exception as e:
         logger.error(f"Erro na consulta ao Grafo de Conhecimento: {str(e)}", exc_info=True)
@@ -550,7 +716,8 @@ async def get_continual_learning_status(model_name: str):
         model_name=model_name,
         drift_status=status.get("drift_status", "Not Monitored"),
         last_drift_score=status.get("last_drift_score"),
-        last_adaptation_time=None # Placeholder
+        last_adaptation_time=None, # Placeholder
+        model_operational_status=status.get("model_operational_status", "N/A")
     )
 
 @app.post("/hpc/accelerate", response_model=HPCAccelerationResponse)
@@ -561,7 +728,7 @@ async def accelerate_hpc_task(request: HPCAccelerationRequest):
     try:
         if request.problem_type == "optimization":
             result = await hpc_accelerator.accelerate_optimization(request.problem_description)
-            return HPCAccelerationResponse(
+            response_data = HPCAccelerationResponse(
                 status="success",
                 optimized_solution=result.get("optimized_solution"),
                 method=result.get("method", "HPC"),
@@ -569,7 +736,7 @@ async def accelerate_hpc_task(request: HPCAccelerationRequest):
             )
         elif request.problem_type == "simulation":
             result = await hpc_accelerator.run_large_scale_simulation(request.problem_description)
-            return HPCAccelerationResponse(
+            response_data = HPCAccelerationResponse(
                 status="success",
                 simulation_results=result.get("simulation_results"),
                 method=result.get("method", "HPC"),
@@ -577,6 +744,9 @@ async def accelerate_hpc_task(request: HPCAccelerationRequest):
             )
         else:
             raise HTTPException(status_code=400, detail="Tipo de problema não suportado para aceleração HPC.")
+        
+        _log_decision_cryptographically("hpc_acceleration", request.dict(), response_data.dict())
+        return response_data
     except Exception as e:
         logger.error(f"Erro na aceleração HPC: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Erro HPC: {str(e)}")
@@ -596,11 +766,63 @@ async def get_model_status():
         "hpc_accelerator_initialized": True,
         "xai_manager_initialized": True,
         "llm_assistant_initialized": True,
+        "vitality_preventive_engine_initialized": True,
+        "report_generator_initialized": True,
         "server_status": "ativo",
         "last_status_check": datetime.now().isoformat()
     }
 
+# --- Novos Endpoints para IoT Biomédica e Relatórios ---
+
+@app.post("/iot/ingest_and_predict", response_model=PreventiveActionReportResponse)
+async def iot_ingest_and_predict(iot_data: IoTSensorData):
+    """
+    Ingere dados de sensores IoT e aciona o motor de atuação preventiva.
+    """
+    if not vitality_preventive_engine.config.IOT_PREVENTIVE_ENABLED:
+        raise HTTPException(status_code=400, detail="Módulo de IoT Preventiva não habilitado na configuração do VitalFlow.")
+
+    try:
+        report = await vitality_preventive_engine.process_iot_data_for_prevention(
+            iot_data.patient_id, iot_data.dict()
+        )
+        response_data = PreventiveActionReportResponse(
+            patient_id=report.patient_id,
+            timestamp=report.timestamp,
+            anomaly_detected=report.anomaly_detected,
+            current_vitals=report.current_vitals,
+            predicted_impact=report.predicted_impact,
+            recommended_action=PrescriptiveActionResponse(**report.recommended_action.__dict__) if report.recommended_action else None,
+            reasoning=report.reasoning,
+            clinical_plausibility_checked=report.clinical_plausibility_checked,
+            model_id=report.model_id
+        )
+        _log_decision_cryptographically("iot_preventive_action", iot_data.dict(), response_data.dict())
+        return response_data
+    except Exception as e:
+        logger.error(f"Erro no processamento de dados IoT para prevenção: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro no módulo IoT Preventiva: {str(e)}")
+
+@app.post("/reports/clinical_summary/{patient_id}", response_model=ClinicalSummaryReportResponse)
+async def get_clinical_summary_report(patient_id: str, patient_data: PatientDataV6):
+    """
+    Gera um relatório de resumo clínico automatizado e auditável para um paciente.
+    """
+    try:
+        report = await report_generator.generate_clinical_summary_report(
+            patient_id, patient_data.dict()
+        )
+        # O report já é um dicionário formatado, basta passá-lo
+        response_data = ClinicalSummaryReportResponse(**report)
+        _log_decision_cryptographically("clinical_summary_report", {"patient_id": patient_id, "patient_data": patient_data.dict()}, response_data.dict())
+        return response_data
+    except Exception as e:
+        logger.error(f"Erro ao gerar relatório clínico para {patient_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro na geração de relatório: {str(e)}")
+
+
 if __name__ == "__main__":
+    import json # Importa json aqui para uso em _log_decision_cryptographically
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
