@@ -31,7 +31,7 @@
   --chart-3: hsl(197, 37%, 24%);
   --chart-4: hsl(43, 74%, 66%);
   --chart-5: hsl(27, 87%, 67%);
-  
+
   /* Medical theme colors */
   --medical-primary: hsl(142, 76%, 36%);
   --medical-secondary: hsl(173, 58%, 39%);
@@ -39,6 +39,10 @@
   --success-light: hsl(142, 76%, 90%);
   --warning-light: hsl(38, 92%, 90%);
   --error-light: hsl(0, 84%, 90%);
+
+  /* NOVAS VARIÁVEIS PARA A BARRA DE ROLAGEM */
+  --scrollbar-thumb-start: hsl(142, 32%, 43%); /* Verde bem claro */
+  --scrollbar-thumb-end: hsl(174, 92%, 14%);   /* Azul-esverdeado bem claro */
 }
 
 @layer base {
@@ -132,14 +136,14 @@
     background: rgba(255, 255, 255, 0.98);
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
-    box-shadow: 
+    box-shadow:
       0 4px 20px rgba(0, 0, 0, 0.05),
       0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
   }
 
   .medical-card:hover {
-    box-shadow: 
+    box-shadow:
       0 8px 30px rgba(0, 0, 0, 0.1),
       0 2px 8px rgba(34, 197, 94, 0.1);
     transform: translateY(-2px);
@@ -177,6 +181,8 @@
     background: linear-gradient(90deg, hsl(var(--medical-primary)), hsl(var(--medical-secondary)));
   }
 }
+
+/* O CÓDIGO ANTIGO DA BARRA DE ROLAGEM FOI REMOVIDO DAQUI */
 
 @keyframes pulse-slow {
   0%, 100% {

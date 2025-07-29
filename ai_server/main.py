@@ -26,6 +26,9 @@ from sklearn.neural_network import MLPClassifier, MLPRegressor
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import advanced models
+from advanced_models import causal_ai, digital_twin, rl_optimizer, initialize_advanced_models
+
 # Configurar TensorFlow para otimização
 # tf.config.experimental.enable_mlir_graph_optimization()
 logging.basicConfig(level=logging.INFO)
@@ -450,6 +453,10 @@ async def startup_event():
     # Train all models
     train_risk_prediction_model()
     train_flow_prediction_model()
+    
+    # Initialize advanced AI models
+    logger.info("🧠 Initializing Advanced AI Models...")
+    initialize_advanced_models()
     
     logger.info("All ML models loaded and ready!")
 

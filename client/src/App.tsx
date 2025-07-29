@@ -16,6 +16,11 @@ import Admissions from "@/pages/admissions";
 import Emergency from "@/pages/emergency";
 import Discharges from "@/pages/discharges";
 import Anomalies from "@/pages/anomalies";
+import DigitalTwin from "@/pages/digital-twin";
+import CausalAI from "@/pages/causal-ai";
+import IoTIntegration from "@/pages/iot-integration";
+import ExecutiveDashboard from "@/pages/executive-dashboard";
+import AIStrategy from "@/pages/ai-strategy";
 import NotFound from "@/pages/not-found";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -42,6 +47,11 @@ function Router() {
             <Route path="/emergency" component={Emergency} />
             <Route path="/discharges" component={Discharges} />
             <Route path="/anomalies" component={Anomalies} />
+            <Route path="/digital-twin" component={DigitalTwin} />
+            <Route path="/causal-ai" component={CausalAI} />
+            <Route path="/iot-integration" component={IoTIntegration} />
+            <Route path="/executive-dashboard" component={ExecutiveDashboard} />
+            <Route path="/ai-strategy" component={AIStrategy} />
             <Route component={NotFound} />
           </Switch>
         </div>

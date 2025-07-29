@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertPatientSchema, insertBedSchema, insertVitalSignsSchema, insertActivitySchema } from "@shared/schema";
 import { predictDeteriorationRisk, optimizeBedAllocation, generatePatientFlowPrediction } from "./services/aiPredictions";
-import { generateClinicalInsights, summarizePatientCondition } from "./services/openai";
+import { generateClinicalInsights, summarizePatientCondition } from "./services/gemini";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Patient routes

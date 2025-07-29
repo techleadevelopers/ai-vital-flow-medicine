@@ -1,5 +1,9 @@
+// src/lib/api.ts
+
+// 1. A importação continua a mesma. Ela vai importar a função mockada de queryClient.ts
 import { apiRequest } from "./queryClient";
 
+// 2. As interfaces podem ficar aqui ou em um arquivo separado (ex: types.ts)
 export interface DashboardStats {
   totalPatients: number;
   highRiskPatients: number;
@@ -8,27 +12,25 @@ export interface DashboardStats {
   generalBeds: number;
   aiAccuracy: number;
 }
-
+// ... Suas outras interfaces ...
 export interface PatientFlowData {
   admissions: number[];
   discharges: number[];
 }
-
 export interface RiskPrediction {
   patientId: string;
   riskScore: number;
   confidence: number;
+  level: string,
   factors: string[];
   recommendation: string;
 }
-
 export interface ClinicalInsight {
-  type: 'staffing' | 'trend' | 'risk' | 'optimization';
+  type: string;
   title: string;
   content: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: string;
 }
-
 export interface Activity {
   id: number;
   type: string;
@@ -38,6 +40,7 @@ export interface Activity {
   severity: string;
 }
 
+// 3. ESTE OBJETO INTEIRO PERMANECE EXATAMENTE IGUAL. NENHUMA ALTERAÇÃO NECESSÁRIA.
 export const api = {
   // Dashboard
   getDashboardStats: async (): Promise<DashboardStats> => {
